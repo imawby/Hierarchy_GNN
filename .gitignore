@@ -1,0 +1,8 @@
+*.pt
+.ipynb_checkpoints
+.DS_Store
+__pycache__/
+*~
+*.pptx
+files/
+*.npz
