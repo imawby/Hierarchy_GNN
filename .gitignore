@@ -6,3 +6,4 @@ __pycache__/
 *.pptx
 files/
 *.npz
+models/
