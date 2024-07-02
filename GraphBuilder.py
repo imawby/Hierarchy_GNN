@@ -13,19 +13,21 @@ def GraphBuilder(eventDict, modeDict) :
         
     # Our lists that we want to fill
     event_node_features = []
+    event_node_truth = []
     
     source_index_pos = []
-    source_index_neg = []
-    
     target_index_pos = []
-    target_index_neg = []    
+    edge_is_primary_pos = []
+    
+    source_index_neg = []
+    target_index_neg = []
+    edge_is_primary_neg = []
     
     source_index_FC = []
     target_index_FC = []
+    edge_is_primary_FC = []
     
     pfpIndex = []
-    
-    print(type(eventDict["vertexX"]))
     
     # Because i'm an idiot and set the vertex default value bad
     failedVertexMask = eventDict["vertexX"] < -990.0
@@ -37,13 +39,12 @@ def GraphBuilder(eventDict, modeDict) :
     eventDict["trackEndY"][failedEndpointMask] = -9999.0
     eventDict["trackEndZ"][failedEndpointMask] = -9999.0
     
-    print(type(eventDict["vertexX"]))
-    
     # I need to add in the neutrino (i need to put this in my analyser?)
     if modeDict["ADD_NEUTRINO"] :
+        eventDict["nParticles"]                              += 1
         # For node
-        eventDict["trackShowerScore"]                         = np.array(np.append(eventDict["trackShowerScore"], -999))
-        eventDict["nHits"]                                    = np.array(np.append(eventDict["nHits"], -999))
+        eventDict["trackShowerScore"]                         = np.array(np.append(eventDict["trackShowerScore"], -999.0))
+        eventDict["nHits"]                                    = np.array(np.append(eventDict["nHits"], -999.0))
         eventDict["charge"]                                   = np.array(np.append(eventDict["charge"], -999.0))
         eventDict["vertexX"]                                  = np.array(np.append(eventDict["vertexX"], eventDict["recoNuVertexX"]))
         eventDict["vertexY"]                                  = np.array(np.append(eventDict["vertexY"], eventDict["recoNuVertexY"]))
@@ -62,13 +63,14 @@ def GraphBuilder(eventDict, modeDict) :
         eventDict["trackLength"]                              = np.array(np.append(eventDict["trackLength"], -999.0))
         eventDict["displacement"]                             = np.array(np.append(eventDict["displacement"], -999.0))
         eventDict["dca"]                                      = np.array(np.append(eventDict["dca"], -999.0))
-        eventDict["isNeutrinoPDG"]                            = np.array(np.append(eventDict["isNeutrinoPDG"], int(1)))
+        eventDict["isNeutrinoPDG"]                            = np.array(np.append(eventDict["isNeutrinoPDG"], int(1)), dtype='int8')
         eventDict["nuVertexEnergyAsymmetry"]                  = np.array(np.append(eventDict["nuVertexEnergyAsymmetry"], -999.0))
         eventDict["nuVertexEnergyWeightedMeanRadialDistance"] = np.array(np.append(eventDict["nuVertexEnergyWeightedMeanRadialDistance"], -999.0))
         # For training
         eventDict["trueTrackID"]                              = np.array(np.append(eventDict["trueTrackID"], 0))
         eventDict["truePDG"]                                  = np.array(np.append(eventDict["truePDG"], -1))
         eventDict["trueVisibleParentTrackID"]                 = np.array(np.append(eventDict["trueVisibleParentTrackID"], -999))
+        eventDict["trueVisibleGeneration"]                    = np.array(np.append(eventDict["trueVisibleGeneration"], 1))
         
         # True information.. (for cheating)
         if modeDict["CHEAT_DIRECTION"] :
@@ -76,8 +78,6 @@ def GraphBuilder(eventDict, modeDict) :
             eventDict["trueMomY"]                          = np.array(np.append(eventDict["trueMomY"], -999.0))
             eventDict["trueMomZ"]                          = np.array(np.append(eventDict["trueMomZ"], -999.0))
      
-    print(type(eventDict["vertexX"]))
-    
     # We need not normalised versions to determine particle-particle links 
     vertex_notNorm = np.concatenate((eventDict["vertexX"].reshape(-1,1), eventDict["vertexY"].reshape(-1,1), eventDict["vertexZ"].reshape(-1,1)), axis=1)
     trackEnd_notNorm = np.concatenate((eventDict["trackEndX"].reshape(-1,1), eventDict["trackEndY"].reshape(-1,1), eventDict["trackEndZ"].reshape(-1,1)), axis=1)
@@ -181,10 +181,13 @@ def GraphBuilder(eventDict, modeDict) :
         isNeutrinoPDG = eventDict["isNeutrinoPDG"][iSourceParticle]
         nuVertexEnergyAsymmetry = eventDict["nuVertexEnergyAsymmetry"][iSourceParticle]
         nuVertexEnergyWeightedMeanRadialDistance = eventDict["nuVertexEnergyWeightedMeanRadialDistance"][iSourceParticle]
+        # Node truth
+        trueVisibleGeneration = eventDict["trueVisibleGeneration"][iSourceParticle]
         
         # I don't know why, but sometimes the ivysaurus score is -inf - cry
         if (math.isnan(ivysaurusMuon) or math.isnan(ivysaurusProton) or math.isnan(ivysaurusPion) \
             or math.isnan(ivysaurusElectron) or math.isnan(ivysaurusPhoton)) :
+            print('skipping ivysaurus for index:', iSourceParticle)
             continue
             
         # Create our node features
@@ -195,30 +198,36 @@ def GraphBuilder(eventDict, modeDict) :
                             displacement, dca, isNeutrinoPDG, trackLength, \
                             trackEndX, trackEndY, trackEndZ, nHits, \
                             nuVertexEnergyAsymmetry, nuVertexEnergyWeightedMeanRadialDistance]
-
+        
         # Append our node
         nGraphNodes += 1
         event_node_features.append(thisModeFeatures)
+        event_node_truth.append(trueVisibleGeneration)
         pfpIndex.append(iSourceParticle)
         
     # Can we actually create a graph?    
     if (nGraphNodes == 0) :
-        print('Have no nodes!')
         # Bail if we have no graph nodes
+        event_node_truth = torch.tensor(event_node_truth, dtype=torch.int64)
         event_node_features = torch.tensor(event_node_features, dtype=torch.float)
         event_edge_index_pos = torch.tensor([source_index_pos, target_index_pos], dtype=torch.long)
         event_edge_index_neg = torch.tensor([source_index_neg, target_index_neg], dtype=torch.long)
         event_edge_index_FC = torch.tensor([source_index_FC, target_index_FC], dtype=torch.long)
+        edge_is_primary_pos = torch.tensor(edge_is_primary_pos, dtype=torch.bool)
+        edge_is_primary_neg = torch.tensor(edge_is_primary_neg, dtype=torch.bool)
+        edge_is_primary_FC = torch.tensor(edge_is_primary_FC, dtype=torch.bool)
         
-        return Data(x=event_node_features, edge_index=event_edge_index_pos), \
-        Data(x=event_node_features, edge_index=event_edge_index_neg), Data(x=event_node_features, edge_index=event_edge_index_FC)
+        return Data(x=event_node_features, edge_index=event_edge_index_pos, y=event_node_truth, edge_attr=edge_is_primary_pos), \
+        Data(x=event_node_features, edge_index=event_edge_index_neg, y=event_node_truth, edge_attr=edge_is_primary_neg), \
+        Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_is_primary_FC), \
+        np.empty(0)
 
         
     # This is to then add in particle-particle edges
     dtype = [('source', int), ('target', int), ('separationSq', float), ('angle', float), ('rank', int)]
     values = []
     
-    # Create our NEUTRINO-PARTICLE edges
+    # Create our NU-PARTICLE edges and POS-NEG graphs
     for iSourceParticle in range(nGraphNodes) :
         
         # Get input vector index of source PFP 
@@ -228,12 +237,91 @@ def GraphBuilder(eventDict, modeDict) :
             
             # Get input vector index of target PFP 
             targetPFPIndex = pfpIndex[iTargetParticle]
+              
+            # Is this a true edge?
+            isTrueEdge = (eventDict["trueTrackID"][targetPFPIndex] == eventDict["trueVisibleParentTrackID"][sourcePFPIndex]) or \
+                         (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex])
                 
-            # Demand that one of them is the neutrino
+            # Is one of them the neutrino?
             isNeutrinoLink = (eventDict["isNeutrinoPDG"][targetPFPIndex] == 1) or (eventDict["isNeutrinoPDG"][sourcePFPIndex] == 1)
             
-            if not isNeutrinoLink :
-                # Save particle-particle knowledge, so we don't have to re-loop
+            # Work out which index is which
+            iParent = iSourceParticle if (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex]) else iTargetParticle
+            iChild = iTargetParticle if (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex]) else iSourceParticle
+     
+            # Fill pos/neg graphs 
+            if (isNeutrinoLink) :
+                
+                # 100 hits
+                passHitThreshold = (eventDict["nHits"][targetPFPIndex] > 0.05) or (eventDict["nHits"][sourcePFPIndex] > 0.05)
+                
+                if (modeDict["IS_PRIMARY_TRAINING"] and passHitThreshold) :
+                    # Append our edges, so that they're directed? why not.
+                    # Only fill pos/neg with neutrino links
+                    if (isTrueEdge) :
+                        # one way
+                        source_index_pos.append(iParent)
+                        target_index_pos.append(iChild)
+                        edge_is_primary_pos.append([True])
+                        # and back the other way
+                        source_index_pos.append(iChild) 
+                        target_index_pos.append(iParent)
+                        edge_is_primary_pos.append([True])
+                        # increase edge count
+                        nPosEdge += 2
+                    else : 
+                        # one way
+                        source_index_neg.append(iParent) 
+                        target_index_neg.append(iChild)
+                        edge_is_primary_neg.append([True])
+                        # and back the other way
+                        source_index_neg.append(iChild)
+                        target_index_neg.append(iParent)
+                        edge_is_primary_neg.append([True])
+                        # increase edge count
+                        nNegEdge += 2
+
+            else :
+                if modeDict["IS_HIGHER_TIER_TRAINING"] :
+                    
+                    # 100 hits
+                    passHitThreshold = (eventDict["nHits"][targetPFPIndex] > 0.05) and (eventDict["nHits"][sourcePFPIndex] > 0.05)
+                    
+                    # Ignore true primary targets, i.e. do not make primary-primary edges
+                    #isTargetTruePrimary = (eventDict["trueVisibleParentTrackID"][targetPFPIndex] == 0)
+                    
+                    #if not isTargetTruePrimary :
+                    if (isTrueEdge) :
+                        # one way
+                        source_index_pos.append(iParent)
+                        target_index_pos.append(iChild)
+                        edge_is_primary_pos.append([False])
+                        # and back the other way
+                        source_index_pos.append(iChild) 
+                        target_index_pos.append(iParent)
+                        edge_is_primary_pos.append([False])
+                        # increase edge count
+                        nPosEdge += 2
+                    else : 
+                        # one way
+                        source_index_neg.append(iParent) 
+                        target_index_neg.append(iChild)
+                        edge_is_primary_neg.append([False])
+                        # and back the other way
+                        source_index_neg.append(iChild)
+                        target_index_neg.append(iParent)
+                        edge_is_primary_neg.append([False])
+                        # increase edge count
+                        nNegEdge += 2
+            
+            # Fill message passing graph info
+            if isNeutrinoLink :
+                # Can straight away add
+                source_index_FC.append(iParent)
+                target_index_FC.append(iChild)
+                edge_is_primary_FC.append([True])
+            else :
+                # Need to save this info, so I can do ranking
                 if modeDict["MAKE_PARTICLE_PARTICLE_LINKS"] :
                     # Calculate opening angle - do need to worry about normalisation
                     sourceDirection = np.array(showerDir_notNorm[sourcePFPIndex])
@@ -256,60 +344,27 @@ def GraphBuilder(eventDict, modeDict) :
                 
                     # Append to dictionary
                     values.append((iSourceParticle, iTargetParticle, minSeparationSq, openingAngle, 0))
-                continue
-                
-            # Work out which index is which
-            iNeutrino = iSourceParticle if (eventDict["isNeutrinoPDG"][sourcePFPIndex] == 1) else iTargetParticle
-            iParticle = iTargetParticle if (eventDict["isNeutrinoPDG"][sourcePFPIndex] == 1) else iSourceParticle
-     
-            # Fill message passing network
-            source_index_FC.append(iNeutrino)
-            target_index_FC.append(iParticle)    
-            
-            ###################################################
-            if modeDict["IS_TRAINING_MODE"] :
-                # Is the edge correct?
-                isTrueEdge = (eventDict["trueTrackID"][targetPFPIndex] == eventDict["trueVisibleParentTrackID"][sourcePFPIndex]) or \
-                             (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex])
-            
-                # Append our edges, so that they're undirected
-                # Only fill pos/neg with neutrino links
-                if (isTrueEdge) :
-                    # one way
-                    source_index_pos.append(iNeutrino)
-                    target_index_pos.append(iParticle)
-                    # and back the other way
-                    #source_index_pos.append(iParticle) 
-                    #target_index_pos.append(iNeutrino)
-                    #nPosEdge += 2
-                    nPosEdge += 1
-                else : 
-                    # one way
-                    source_index_neg.append(iSourceParticle) 
-                    target_index_neg.append(iTargetParticle)
-                    # and back the other way
-                    source_index_neg.append(iTargetParticle)
-                    target_index_neg.append(iSourceParticle)
-                    nNegEdge += 2
-            ###################################################
             
     # Can we make our training graphs?        
-    if modeDict["IS_TRAINING_MODE"] :    
-        if ((nPosEdge == 0) or (nNegEdge == 0)) :
-            print("We cannot make our training graphs")
-                  
-            # Bail if we have no graph nodes
+    if ((modeDict["IS_PRIMARY_TRAINING"]) or (modeDict["IS_HIGHER_TIER_TRAINING"])) :    
+        if ((nPosEdge == 0) and (nNegEdge == 0)) :       
+            # Bail if we have no graph edges
+            event_node_truth = torch.tensor(event_node_truth, dtype=torch.int64)
             event_node_features = torch.tensor(event_node_features, dtype=torch.float)
             event_edge_index_pos = torch.tensor([source_index_pos, target_index_pos], dtype=torch.long)
             event_edge_index_neg = torch.tensor([source_index_neg, target_index_neg], dtype=torch.long)
             event_edge_index_FC = torch.tensor([source_index_FC, target_index_FC], dtype=torch.long)
+            edge_is_primary_pos = torch.tensor(edge_is_primary_pos, dtype=torch.bool)
+            edge_is_primary_neg = torch.tensor(edge_is_primary_neg, dtype=torch.bool)
+            edge_is_primary_FC = torch.tensor(edge_is_primary_FC, dtype=torch.bool)
                   
-            return Data(x=event_node_features, edge_index=event_edge_index_pos), \
-        Data(x=event_node_features, edge_index=event_edge_index_neg), Data(x=event_node_features, edge_index=event_edge_index_FC)
+            return Data(x=event_node_features, edge_index=event_edge_index_pos, y=event_node_truth, edge_attr=edge_is_primary_pos), \
+            Data(x=event_node_features, edge_index=event_edge_index_neg, y=event_node_truth, edge_attr=edge_is_primary_neg), \
+            Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_is_primary_FC), \
+            np.empty(0)
         
     # Now make PARTICLE-PARTICLE matches
     if modeDict["MAKE_PARTICLE_PARTICLE_LINKS"] :
-                  
         particle_particle_edges = np.array(values, dtype=dtype)       # create a structured array
     
         # Do the opening angle ranking
@@ -327,19 +382,29 @@ def GraphBuilder(eventDict, modeDict) :
         for index in range(math.floor(len(particle_particle_edges) * modeDict["EDGE_FRACTION"])) :
             # One way
             source_index_FC.append(particle_particle_edges['source'][index])
-            target_index_FC.append(particle_particle_edges['target'][index])            
+            target_index_FC.append(particle_particle_edges['target'][index]) 
+            edge_is_primary_FC.append([False])
             # Other way 
             source_index_FC.append(particle_particle_edges['target'][index])
-            target_index_FC.append(particle_particle_edges['source'][index])            
-                
+            target_index_FC.append(particle_particle_edges['source'][index])        
+            edge_is_primary_FC.append([False])
+                    
+    #print('event_truth_pos:', event_truth_pos)
+    #print('event_truth_neg:', event_truth_neg)
+    #print('event_truth_FC:', event_truth_FC)
+    
+    event_node_truth = torch.tensor(event_node_truth, dtype=torch.int64)
     event_node_features = torch.tensor(event_node_features, dtype=torch.float)
     event_edge_index_pos = torch.tensor([source_index_pos, target_index_pos], dtype=torch.long)
     event_edge_index_neg = torch.tensor([source_index_neg, target_index_neg], dtype=torch.long)
     event_edge_index_FC = torch.tensor([source_index_FC, target_index_FC], dtype=torch.long)
-        
+    edge_is_primary_pos = torch.tensor(edge_is_primary_pos, dtype=torch.bool)
+    edge_is_primary_neg = torch.tensor(edge_is_primary_neg, dtype=torch.bool)
+    edge_is_primary_FC = torch.tensor(edge_is_primary_FC, dtype=torch.bool)
+    
     # turn into data
-    data_pos = Data(x=event_node_features, edge_index=event_edge_index_pos)
-    data_neg = Data(x=event_node_features, edge_index=event_edge_index_neg)
-    data_FC = Data(x=event_node_features, edge_index=event_edge_index_FC)
+    data_pos = Data(x=event_node_features, edge_index=event_edge_index_pos, y=event_node_truth, edge_attr=edge_is_primary_pos)
+    data_neg = Data(x=event_node_features, edge_index=event_edge_index_neg, y=event_node_truth, edge_attr=edge_is_primary_neg)
+    data_FC = Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_is_primary_FC)
                   
-    return data_pos, data_neg, data_FC
+    return data_pos, data_neg, data_FC, np.array(pfpIndex)

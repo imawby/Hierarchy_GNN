@@ -11,8 +11,8 @@ trackShowerLimitHigh = 1.0
 trackShowerInterval = math.fabs(trackShowerLimitLow) + math.fabs(trackShowerLimitHigh)
 
 # nHits
-nHitsLimitLow = 0
-nHitsLimitHigh = 2000
+nHitsLimitLow = 0.0
+nHitsLimitHigh = 2000.0
 nHitsInterval = math.fabs(nHitsLimitLow) + math.fabs(nHitsLimitHigh)
 
 # charge
@@ -70,69 +70,73 @@ nuVertexEnergyWeightedMeanRadialDistanceLow = -1.0
 nuVertexEnergyWeightedMeanRadialDistanceHigh = 20.0
 nuVertexEnergyWeightedMeanRadialDistanceInterval = math.fabs(nuVertexEnergyWeightedMeanRadialDistanceLow) + math.fabs(nuVertexEnergyWeightedMeanRadialDistanceHigh)
 
+############################
+# Functions
+############################
+
 def normaliseTrackShowerScore(trackShowerScore_np) :
     trackShowerScore_np[trackShowerScore_np < trackShowerLimitLow] = trackShowerLimitLow
     trackShowerScore_np[trackShowerScore_np > trackShowerLimitHigh] = trackShowerLimitHigh
-    trackShowerScore_np = trackShowerScore_np / trackShowerInterval
+    trackShowerScore_np /= trackShowerInterval
     
 def normaliseNHits(nHits_np) :
     nHits_np[nHits_np < nHitsLimitLow] = nHitsLimitLow
     nHits_np[nHits_np > nHitsLimitHigh] = nHitsLimitHigh
-    nHits_np = nHits_np / nHitsInterval
+    nHits_np /= float(nHitsInterval)
     
 def normaliseCharge(charge_np) :
     charge_np[charge_np < chargeLimitLow] = chargeLimitLow
     charge_np[charge_np > chargeLimitHigh] = chargeLimitHigh
-    charge_np = charge_np / chargeInterval
+    charge_np /= chargeInterval
     
 def normalisePositionX(positionX_np) :
     positionX_np[positionX_np < vertexXLimitLow] = vertexXLimitLow
     positionX_np[positionX_np > vertexXLimitHigh] = vertexXLimitHigh
-    positionX_np = positionX_np / vertexXInterval
+    positionX_np /= vertexXInterval
     
 def normalisePositionY(positionY_np) :
     positionY_np[positionY_np < vertexYLimitLow] = vertexYLimitLow
     positionY_np[positionY_np > vertexYLimitHigh] = vertexYLimitHigh
-    positionY_np = positionY_np / vertexYInterval
+    positionY_np /= vertexYInterval
     
 def normalisePositionZ(positionZ_np) :
     positionZ_np[positionZ_np < vertexZLimitLow] = vertexZLimitLow
     positionZ_np[positionZ_np > vertexZLimitHigh] = vertexZLimitHigh
-    positionZ_np = positionZ_np / vertexZInterval
+    positionZ_np /= vertexZInterval
     
 def normaliseShowerDir(showerDir_np) :
     showerDir_np[showerDir_np < showerDirLimitLow] = showerDirLimitLow
     showerDir_np[showerDir_np > showerDirLimitHigh] = showerDirLimitHigh
-    showerDir_np = showerDir_np / showerDirInterval
+    showerDir_np /= showerDirInterval
     
 def normaliseIvysaurusScore(ivysaurus_np) :
     ivysaurus_np[ivysaurus_np < ivysaurusLimitLow] = ivysaurusLimitLow
     ivysaurus_np[ivysaurus_np > ivysaurusLimitHigh] = ivysaurusLimitHigh
-    ivysaurus_np = ivysaurus_np / ivysaurusInterval
+    ivysaurus_np /= ivysaurusInterval
     
 def normaliseTrackLength(trackLength_np) :    
     trackLength_np[trackLength_np < trackLengthLimitLow] = trackLengthLimitLow
     trackLength_np[trackLength_np > trackLengthLimitHigh] = trackLengthLimitHigh
-    trackLength_np = trackLength_np / trackLengthInterval
+    trackLength_np /= trackLengthInterval
     
 def normaliseDisplacement(displacement_np) :
     displacement_np[displacement_np < displacementLimitLow] = displacementLimitLow
     displacement_np[displacement_np > displacementLimitHigh] = displacementLimitHigh
-    displacement_np = displacement_np / displacementInterval
+    displacement_np /= displacementInterval
     
 def normaliseDCA(dca_np) :
     dca_np[dca_np < dcaLimitLow] = dcaLimitLow
     dca_np[dca_np > dcaLimitHigh] = dcaLimitHigh
-    dca_np = dca_np / dcaInterval   
+    dca_np /= dcaInterval   
     
 def normaliseNuVertexEnergyAsymmetry(nuVertexEnergyAsymmetry_np) :
     nuVertexEnergyAsymmetry_np[nuVertexEnergyAsymmetry_np < nuVertexEnergyAsymmetryLow] = nuVertexEnergyAsymmetryLow
     nuVertexEnergyAsymmetry_np[nuVertexEnergyAsymmetry_np > nuVertexEnergyAsymmetryHigh] = nuVertexEnergyAsymmetryHigh
-    nuVertexEnergyAsymmetry_np = nuVertexEnergyAsymmetry_np / nuVertexEnergyAsymmetryInterval
+    nuVertexEnergyAsymmetry_np /= nuVertexEnergyAsymmetryInterval
     
 def normaliseNuVertexEnergyWeightedMeanRadialDistance(nuVertexEnergyWeightedMeanRadialDistance_np) :
     nuVertexEnergyWeightedMeanRadialDistance_np[nuVertexEnergyWeightedMeanRadialDistance_np < nuVertexEnergyWeightedMeanRadialDistanceLow] = nuVertexEnergyWeightedMeanRadialDistanceLow
     nuVertexEnergyWeightedMeanRadialDistance_np[nuVertexEnergyWeightedMeanRadialDistance_np > nuVertexEnergyWeightedMeanRadialDistanceHigh] = nuVertexEnergyWeightedMeanRadialDistanceHigh
-    nuVertexEnergyWeightedMeanRadialDistance_np = nuVertexEnergyWeightedMeanRadialDistance_np / nuVertexEnergyWeightedMeanRadialDistanceInterval    
+    nuVertexEnergyWeightedMeanRadialDistance_np /= nuVertexEnergyWeightedMeanRadialDistanceInterval    
     
     
