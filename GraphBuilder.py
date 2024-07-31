@@ -3,6 +3,7 @@ import numpy as np
 import sys
 import torch
 from torch_geometric.data import Data
+from tensorflow.keras.utils import to_categorical
 
 import Normalisation
 
@@ -25,7 +26,7 @@ def GraphBuilder(eventDict, modeDict) :
     
     source_index_FC = []
     target_index_FC = []
-    edge_is_primary_FC = []
+    edge_weight_FC = [] # do dca?
     
     pfpIndex = []
     
@@ -78,10 +79,11 @@ def GraphBuilder(eventDict, modeDict) :
             eventDict["trueMomY"]                          = np.array(np.append(eventDict["trueMomY"], -999.0))
             eventDict["trueMomZ"]                          = np.array(np.append(eventDict["trueMomZ"], -999.0))
      
-    # We need not normalised versions to determine particle-particle links 
+    # We need not normalised versions of some vectors... 
     vertex_notNorm = np.concatenate((eventDict["vertexX"].reshape(-1,1), eventDict["vertexY"].reshape(-1,1), eventDict["vertexZ"].reshape(-1,1)), axis=1)
     trackEnd_notNorm = np.concatenate((eventDict["trackEndX"].reshape(-1,1), eventDict["trackEndY"].reshape(-1,1), eventDict["trackEndZ"].reshape(-1,1)), axis=1)
     showerDir_notNorm = np.concatenate((eventDict["showerDirX"].reshape(-1,1), eventDict["showerDirY"].reshape(-1,1), eventDict["showerDirZ"].reshape(-1,1)), axis=1)
+    dca_notNorm = eventDict["dca"]
     
     if modeDict["CHEAT_DIRECTION"] :
         # Replace shower direction with truth
@@ -112,6 +114,9 @@ def GraphBuilder(eventDict, modeDict) :
         noDCAMask = eventDict["dca"] < -990
         eventDict["dca"] = np.linalg.norm(np.cross(displacementVec, showerDir_notNorm), axis=1)
         eventDict["dca"][noDCAMask] = -999.0
+        
+        # Update the not normalised vector versions... 
+        dca_notNorm = eventDict["dca"]
         
     if modeDict["CHEAT_PID"] :
         eventDict["ivysaurusMuon"][np.abs(eventDict["truePDG"]) == 13] = 1
@@ -199,27 +204,33 @@ def GraphBuilder(eventDict, modeDict) :
                             trackEndX, trackEndY, trackEndZ, nHits, \
                             nuVertexEnergyAsymmetry, nuVertexEnergyWeightedMeanRadialDistance]
         
+        # Get node truth
+        thisNodeTruth = (trueVisibleGeneration - 1) # So 0 = nu, 1 = primaries etc...
+        thisNodeTruth = min(thisNodeTruth, modeDict["MAX_NODE_CLASS"]) # Tier class cap
+        thisNodeTruth = modeDict["MAX_NODE_CLASS"] if (thisNodeTruth < 0) else thisNodeTruth # Targets -999 instances
+        thisNodeTruth = to_categorical(thisNodeTruth, modeDict["MAX_NODE_CLASS"] + 1).tolist() # To include 0
+        
         # Append our node
         nGraphNodes += 1
         event_node_features.append(thisModeFeatures)
-        event_node_truth.append(trueVisibleGeneration)
+        event_node_truth.append(thisNodeTruth)
         pfpIndex.append(iSourceParticle)
         
     # Can we actually create a graph?    
     if (nGraphNodes == 0) :
         # Bail if we have no graph nodes
-        event_node_truth = torch.tensor(event_node_truth, dtype=torch.int64)
+        event_node_truth = torch.tensor(event_node_truth, dtype=torch.float)
         event_node_features = torch.tensor(event_node_features, dtype=torch.float)
         event_edge_index_pos = torch.tensor([source_index_pos, target_index_pos], dtype=torch.long)
         event_edge_index_neg = torch.tensor([source_index_neg, target_index_neg], dtype=torch.long)
         event_edge_index_FC = torch.tensor([source_index_FC, target_index_FC], dtype=torch.long)
         edge_is_primary_pos = torch.tensor(edge_is_primary_pos, dtype=torch.bool)
         edge_is_primary_neg = torch.tensor(edge_is_primary_neg, dtype=torch.bool)
-        edge_is_primary_FC = torch.tensor(edge_is_primary_FC, dtype=torch.bool)
+        edge_weight_FC = torch.tensor(edge_weight_FC, dtype=torch.float)
         
         return Data(x=event_node_features, edge_index=event_edge_index_pos, y=event_node_truth, edge_attr=edge_is_primary_pos), \
         Data(x=event_node_features, edge_index=event_edge_index_neg, y=event_node_truth, edge_attr=edge_is_primary_neg), \
-        Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_is_primary_FC), \
+        Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_weight_FC), \
         np.empty(0)
 
         
@@ -248,6 +259,9 @@ def GraphBuilder(eventDict, modeDict) :
             # Work out which index is which
             iParent = iSourceParticle if (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex]) else iTargetParticle
             iChild = iTargetParticle if (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex]) else iSourceParticle
+            
+            parentIndex = sourcePFPIndex if (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex]) else targetPFPIndex
+            targetIndex = targetPFPIndex if (eventDict["trueTrackID"][sourcePFPIndex] == eventDict["trueVisibleParentTrackID"][targetPFPIndex]) else sourcePFPIndex
      
             # Fill pos/neg graphs 
             if (isNeutrinoLink) :
@@ -316,10 +330,12 @@ def GraphBuilder(eventDict, modeDict) :
             
             # Fill message passing graph info
             if isNeutrinoLink :
-                # Can straight away add
+                # Add one way
                 source_index_FC.append(iParent)
                 target_index_FC.append(iChild)
-                edge_is_primary_FC.append([True])
+                # Add the edge weight - smaller DCA is more important
+                edge_weight_FC.append([0.0 if (dca_notNorm[targetIndex] < 0.0001) else 1.0 / dca_notNorm[targetIndex]])
+                #edge_is_primary_FC.append([True])
             else :
                 # Need to save this info, so I can do ranking
                 if modeDict["MAKE_PARTICLE_PARTICLE_LINKS"] :
@@ -349,18 +365,18 @@ def GraphBuilder(eventDict, modeDict) :
     if ((modeDict["IS_PRIMARY_TRAINING"]) or (modeDict["IS_HIGHER_TIER_TRAINING"])) :    
         if ((nPosEdge == 0) and (nNegEdge == 0)) :       
             # Bail if we have no graph edges
-            event_node_truth = torch.tensor(event_node_truth, dtype=torch.int64)
+            event_node_truth = torch.tensor(event_node_truth, dtype=torch.float)
             event_node_features = torch.tensor(event_node_features, dtype=torch.float)
             event_edge_index_pos = torch.tensor([source_index_pos, target_index_pos], dtype=torch.long)
             event_edge_index_neg = torch.tensor([source_index_neg, target_index_neg], dtype=torch.long)
             event_edge_index_FC = torch.tensor([source_index_FC, target_index_FC], dtype=torch.long)
             edge_is_primary_pos = torch.tensor(edge_is_primary_pos, dtype=torch.bool)
             edge_is_primary_neg = torch.tensor(edge_is_primary_neg, dtype=torch.bool)
-            edge_is_primary_FC = torch.tensor(edge_is_primary_FC, dtype=torch.bool)
-                  
+            edge_weight_FC = torch.tensor(edge_weight_FC, dtype=torch.float)
+                
             return Data(x=event_node_features, edge_index=event_edge_index_pos, y=event_node_truth, edge_attr=edge_is_primary_pos), \
             Data(x=event_node_features, edge_index=event_edge_index_neg, y=event_node_truth, edge_attr=edge_is_primary_neg), \
-            Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_is_primary_FC), \
+            Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_weight_FC), \
             np.empty(0)
         
     # Now make PARTICLE-PARTICLE matches
@@ -383,28 +399,32 @@ def GraphBuilder(eventDict, modeDict) :
             # One way
             source_index_FC.append(particle_particle_edges['source'][index])
             target_index_FC.append(particle_particle_edges['target'][index]) 
-            edge_is_primary_FC.append([False])
+            #edge_is_primary_FC.append([False])
+            # Add the edge weight - smaller DCA is more important
+            edge_weight_FC.append([1.0])
             # Other way 
             source_index_FC.append(particle_particle_edges['target'][index])
             target_index_FC.append(particle_particle_edges['source'][index])        
-            edge_is_primary_FC.append([False])
+            #edge_is_primary_FC.append([False])
+            # Add the edge weight - smaller DCA is more important
+            edge_weight_FC.append([1.0])
                     
     #print('event_truth_pos:', event_truth_pos)
     #print('event_truth_neg:', event_truth_neg)
     #print('event_truth_FC:', event_truth_FC)
     
-    event_node_truth = torch.tensor(event_node_truth, dtype=torch.int64)
+    event_node_truth = torch.tensor(event_node_truth, dtype=torch.float)
     event_node_features = torch.tensor(event_node_features, dtype=torch.float)
     event_edge_index_pos = torch.tensor([source_index_pos, target_index_pos], dtype=torch.long)
     event_edge_index_neg = torch.tensor([source_index_neg, target_index_neg], dtype=torch.long)
     event_edge_index_FC = torch.tensor([source_index_FC, target_index_FC], dtype=torch.long)
     edge_is_primary_pos = torch.tensor(edge_is_primary_pos, dtype=torch.bool)
     edge_is_primary_neg = torch.tensor(edge_is_primary_neg, dtype=torch.bool)
-    edge_is_primary_FC = torch.tensor(edge_is_primary_FC, dtype=torch.bool)
+    edge_weight_FC = torch.tensor(edge_weight_FC, dtype=torch.float)
     
     # turn into data
     data_pos = Data(x=event_node_features, edge_index=event_edge_index_pos, y=event_node_truth, edge_attr=edge_is_primary_pos)
     data_neg = Data(x=event_node_features, edge_index=event_edge_index_neg, y=event_node_truth, edge_attr=edge_is_primary_neg)
-    data_FC = Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_is_primary_FC)
+    data_FC = Data(x=event_node_features, edge_index=event_edge_index_FC, y=event_node_truth, edge_attr=edge_weight_FC)
                   
     return data_pos, data_neg, data_FC, np.array(pfpIndex)

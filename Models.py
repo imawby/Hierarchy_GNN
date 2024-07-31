@@ -16,8 +16,8 @@ class GNN(torch.nn.Module):
         return x
     
 
-# Our final classifier applies the dot-product between source and destination
-class Classifier(torch.nn.Module):
+# Our edge classifier applies the dot-product between source and destination
+class EdgeClassifier(torch.nn.Module):
     
     def forward(self, x, edge_index) :
         # Convert node embeddings to edge-level representations:
@@ -26,6 +26,16 @@ class Classifier(torch.nn.Module):
         # Apply dot-product to get a prediction per supervision edge:
         dot_product = (source_node_features * target_node_features).sum(dim=-1)
         return torch.sigmoid(dot_product)
+    
+# Our node classifier
+class NodeClassifier(torch.nn.Module):
+    def __init__(self, hidden_channels, num_classes):
+        super().__init__()
+        self.fc = torch.nn.Linear(hidden_channels, num_classes)
+    
+    def forward(self, x) :
+        x = self.fc(x)
+        return x
 
 #class Model(torch.nn.Module):
 #    
