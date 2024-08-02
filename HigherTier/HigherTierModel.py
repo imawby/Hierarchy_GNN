@@ -1,7 +1,7 @@
 from tensorflow.keras import Input, Model
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Dropout
 
-def HigherTierModel(nVariables):
+def HigherTierModel(nVariables, dropoutRate=0.5):
     
     networkInputs = Input(shape=(nVariables, ))
     
@@ -18,9 +18,9 @@ def HigherTierModel(nVariables):
 
     # Lets put the convolutions through a couple of dense layers first
     x = Dense(128, activation="relu", kernel_initializer='lecun_uniform')(networkInputs)
-    #x = Dropout(dropoutRate)(x)
+    x = Dropout(dropoutRate)(x)
     x = Dense(128, activation="relu", kernel_initializer='lecun_uniform')(x)
-    #x = Dropout(dropoutRate)(x)
+    x = Dropout(dropoutRate)(x)
     x = Dense(64, activation="relu", kernel_initializer='lecun_uniform')(x)
     
     prediction = Dense(1, activation='sigmoid')(x)
