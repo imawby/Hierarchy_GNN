@@ -40,7 +40,7 @@ def GraphBuilder(eventDict, modeDict) :
     eventDict["trackEndY"][failedEndpointMask] = -9999.0
     eventDict["trackEndZ"][failedEndpointMask] = -9999.0
     
-    # I need to add in the neutrino (i need to put this in my analyser?)
+    # I need to add in the neutrino 
     if modeDict["ADD_NEUTRINO"] :
         eventDict["nParticles"]                              += 1
         # For node
@@ -189,6 +189,10 @@ def GraphBuilder(eventDict, modeDict) :
         # Node truth
         trueVisibleGeneration = eventDict["trueVisibleGeneration"][iSourceParticle]
         
+        # Skip 2D particles?? - i think that this will do it...
+        if (vertex_notNorm[iSourceParticle][0] < -990.0) :
+            continue
+        
         # I don't know why, but sometimes the ivysaurus score is -inf - cry
         if (math.isnan(ivysaurusMuon) or math.isnan(ivysaurusProton) or math.isnan(ivysaurusPion) \
             or math.isnan(ivysaurusElectron) or math.isnan(ivysaurusPhoton)) :
@@ -295,38 +299,38 @@ def GraphBuilder(eventDict, modeDict) :
                         # increase edge count
                         nNegEdge += 2
 
-            else :
-                if modeDict["IS_HIGHER_TIER_TRAINING"] :
+#             else :
+#                 if modeDict["IS_HIGHER_TIER_TRAINING"] :
                     
-                    # 100 hits
-                    passHitThreshold = (eventDict["nHits"][targetPFPIndex] > 0.05) and (eventDict["nHits"][sourcePFPIndex] > 0.05)
+#                     # 100 hits
+#                     passHitThreshold = (eventDict["nHits"][targetPFPIndex] > 0.05) and (eventDict["nHits"][sourcePFPIndex] > 0.05)
                     
-                    # Ignore true primary targets, i.e. do not make primary-primary edges
-                    #isTargetTruePrimary = (eventDict["trueVisibleParentTrackID"][targetPFPIndex] == 0)
+#                     # Ignore true primary targets, i.e. do not make primary-primary edges
+#                     #isTargetTruePrimary = (eventDict["trueVisibleParentTrackID"][targetPFPIndex] == 0)
                     
-                    #if not isTargetTruePrimary :
-                    if (isTrueEdge) :
-                        # one way
-                        source_index_pos.append(iParent)
-                        target_index_pos.append(iChild)
-                        edge_is_primary_pos.append([False])
-                        # and back the other way
-                        source_index_pos.append(iChild) 
-                        target_index_pos.append(iParent)
-                        edge_is_primary_pos.append([False])
-                        # increase edge count
-                        nPosEdge += 2
-                    else : 
-                        # one way
-                        source_index_neg.append(iParent) 
-                        target_index_neg.append(iChild)
-                        edge_is_primary_neg.append([False])
-                        # and back the other way
-                        source_index_neg.append(iChild)
-                        target_index_neg.append(iParent)
-                        edge_is_primary_neg.append([False])
-                        # increase edge count
-                        nNegEdge += 2
+#                     #if not isTargetTruePrimary :
+#                     if (isTrueEdge) :
+#                         # one way
+#                         source_index_pos.append(iParent)
+#                         target_index_pos.append(iChild)
+#                         edge_is_primary_pos.append([False])
+#                         # and back the other way
+#                         source_index_pos.append(iChild) 
+#                         target_index_pos.append(iParent)
+#                         edge_is_primary_pos.append([False])
+#                         # increase edge count
+#                         nPosEdge += 2
+#                     else : 
+#                         # one way
+#                         source_index_neg.append(iParent) 
+#                         target_index_neg.append(iChild)
+#                         edge_is_primary_neg.append([False])
+#                         # and back the other way
+#                         source_index_neg.append(iChild)
+#                         target_index_neg.append(iParent)
+#                         edge_is_primary_neg.append([False])
+#                         # increase edge count
+#                         nNegEdge += 2
             
             # Fill message passing graph info
             if isNeutrinoLink :
