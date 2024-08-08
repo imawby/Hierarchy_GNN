@@ -163,86 +163,32 @@ def readTree(fileNames) :
 ############################################################################################################################################
 ############################################################################################################################################
 
-def readEvent(fileName, iEvent) :
-    
+def readEvent(arrayDict) :
+      
     ###################################
-    # To pull out of tree
+    # Make sure things are numpy arrays
     ###################################
     # Node variables
-    parentTrackScore = []
-    parentNuVertexSeparation = []
-    childNuVertexSeparation = []
-    #parentBraggVariable = []
-    parentEndRegionNHits = []
-    parentEndRegionNParticles = []
-    parentEndRegionRToWall = []
+    parentTrackScore = np.array(arrayDict["parentTrackScore"])
+    parentNuVertexSeparation = np.array(arrayDict["parentNuVertexSeparation"])
+    childNuVertexSeparation = np.array(arrayDict["childNuVertexSeparation"])
+    parentEndRegionNHits = np.array(arrayDict["parentEndRegionNHits"])
+    parentEndRegionNParticles = np.array(arrayDict["parentEndRegionNParticles"])
+    parentEndRegionRToWall = np.array(arrayDict["parentEndRegionRToWall"])
     # Edge information                                                                                                                                                                                                    
-    vertexSeparation = []
-    #separationU = []
-    #separationV = []
-    #separationW = []
-    separation3D = []
-    chargeRatio = []
-    pidLinkType = []
-    openingAngle = []
-    trackShowerLinkType = []
-    # Truth
-    trueParentChildLink = []
-    # Reco
-    parentPFPIndices = []
-    childPFPIndices = []
-    
-    ###################################
-    # Read tree
-    ###################################    
-    treeFile = uproot.open(fileName)
-    tree = treeFile['ccnuselection/ccnusel']
-    branches = tree.arrays()
-
-    # Node variables
-    parentTrackScore.extend(branches['ParentTrackScore'][iEvent])
-    parentNuVertexSeparation.extend(branches['ParentNuVertexSeparation'][iEvent])
-    childNuVertexSeparation.extend(branches['ChildNuVertexSeparation'][iEvent])
-    parentEndRegionNHits.extend(branches['ParentEndRegionNHits'][iEvent])
-    parentEndRegionNParticles.extend(branches['ParentEndRegionNParticles'][iEvent])
-    parentEndRegionRToWall.extend(branches['ParentEndRegionRToWall'][iEvent])
-    # Edge information
-    vertexSeparation.extend(branches['VertexSeparation'][iEvent])
-    separation3D.extend(branches['Separation3D'][iEvent])
-    chargeRatio.extend(branches['ChargeRatio'][iEvent])
-    pidLinkType.extend(branches['PIDLinkType'][iEvent])
-    openingAngle.extend(branches['OpeningAngle'][iEvent])
-    trackShowerLinkType.extend(branches['TrackShowerLinkType'][iEvent]) 
+    vertexSeparation = np.array(arrayDict["vertexSeparation"])
+    separation3D = np.array(arrayDict["separation3D"])
+    chargeRatio = np.array(arrayDict["chargeRatio"])
+    pidLinkType = np.array(arrayDict["pidLinkType"])
+    openingAngle = np.array(arrayDict["openingAngle"])
+    trackShowerLinkType = np.array(arrayDict["trackShowerLinkType"])
     # Truth 
-    trueParentChildLink.extend(branches['TrueParentChildLink'][iEvent])
-    # Reco
-    parentPFPIndices.extend(branches['ParentPFPIndex'][iEvent])
-    childPFPIndices.extend(branches['ChildPFPIndex'][iEvent])
-                
-    nLinks = len(trueParentChildLink)
-        
-    ###################################
-    # Now turn things into numpy arrays
-    ###################################
-    # Node variables
-    parentTrackScore = np.array(parentTrackScore)
-    parentNuVertexSeparation = np.array(parentNuVertexSeparation)
-    childNuVertexSeparation = np.array(childNuVertexSeparation)
-    parentEndRegionNHits = np.array(parentEndRegionNHits)
-    parentEndRegionNParticles = np.array(parentEndRegionNParticles)
-    parentEndRegionRToWall = np.array(parentEndRegionRToWall)
-    # Edge information                                                                                                                                                                                                    
-    vertexSeparation = np.array(vertexSeparation)
-    separation3D = np.array(separation3D)
-    chargeRatio = np.array(chargeRatio)
-    pidLinkType = np.array(pidLinkType)
-    openingAngle = np.array(openingAngle)
-    trackShowerLinkType = np.array(trackShowerLinkType)
-    # Truth 
-    trueParentChildLink = np.array(trueParentChildLink, dtype='int64')
+    trueParentChildLink = np.array(arrayDict["trueParentChildLink"], dtype='int64')
     # Reco 
-    parentPFPIndices = np.array(parentPFPIndices, dtype='int64')
-    childPFPIndices = np.array(childPFPIndices, dtype='int64')
+    parentPFPIndices = np.array(arrayDict["parentPFPIndices"], dtype='int64')
+    childPFPIndices = np.array(arrayDict["childPFPIndices"], dtype='int64')
+    
+    nLinks = trueParentChildLink.shape[0]
             
     ###################################
     # Normalise variables
