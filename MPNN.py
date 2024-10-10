@@ -1,6 +1,6 @@
 #emb_dim=64
 import torch
-from torch.nn import Module, Sequential, Linear, BatchNorm1d, ReLU
+from torch.nn import Module, Sequential, Linear, BatchNorm1d, ReLU, Dropout
 from torch_geometric.nn import MessagePassing
 
 class MPNNLayer(MessagePassing):
@@ -27,8 +27,13 @@ class MPNNLayer(MessagePassing):
         message_output_dim = emb_dim
         
         self.mlp_msg = Sequential(
-            Linear(message_input_dim, message_output_dim), BatchNorm1d(message_output_dim), ReLU(),
-            Linear(message_output_dim, message_output_dim), BatchNorm1d(message_output_dim), ReLU()
+            Linear(message_input_dim, message_output_dim), 
+            BatchNorm1d(message_output_dim), 
+            ReLU(),
+            Dropout(0.5),
+            Linear(message_output_dim, message_output_dim), 
+            BatchNorm1d(message_output_dim), 
+            ReLU()
         )
         
         ##########################################
@@ -40,8 +45,13 @@ class MPNNLayer(MessagePassing):
         update_output_dim = emb_dim
         
         self.mlp_upd = Sequential(
-            Linear(update_input_dim, update_output_dim), BatchNorm1d(update_output_dim), ReLU(), 
-            Linear(update_output_dim, update_output_dim), BatchNorm1d(update_output_dim), ReLU()
+            Linear(update_input_dim, update_output_dim), 
+            BatchNorm1d(update_output_dim), 
+            ReLU(), 
+            Dropout(0.5),
+            Linear(update_output_dim, update_output_dim), 
+            BatchNorm1d(update_output_dim), 
+            ReLU()
         )
 
     def forward(self, h, edge_index, edge_attr):
