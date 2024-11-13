@@ -459,8 +459,6 @@ def readTreeGroupLinks_track(fileNames) :
     ###################################
     # Link variables
     parentTrackScore = []
-    parentNuVertexSeparation = []
-    childNuVertexSeparation = []
     parentEndRegionNHits = [[], [], [], []]
     parentEndRegionNParticles = [[], [], [], []]
     parentEndRegionRToWall = [[], [], [], []]
@@ -479,11 +477,19 @@ def readTreeGroupLinks_track(fileNames) :
     parentConnectionPointNHitRatio = [[], [], [], []]
     parentConnectionPointEigenValueRatio = [[], [], [], []]
     parentConnectionPointOpeningAngle = [[], [], [], []]
+    parentIsPOIClosestToNu = [[], [], [], []]
+    childIsPOIClosestToNu = [[], [], [], []]
     pidLinkType = []
-    trackShowerLinkType = []
+    # Training cut variables
+    trainingCutSep = []
+    trainingCutL = []
+    trainingCutT = []
+    trainingCutDoesConnect = []
     # Truth
     trueParentChildLink = []
     isLinkOrientationCorrect = []
+    trueParentVisibleGeneration = []
+    trueChildVisibleGeneration = []
     y = []
     
     for fileName in fileNames :
@@ -496,11 +502,14 @@ def readTreeGroupLinks_track(fileNames) :
         nEvents = len(branches)
         
         for iEvent in range(nEvents) :
+                        
+            if ((iEvent % 10) == 0) :
+                print('iEvent:', str(iEvent) + '/' + str(nEvents))
             
             # Failed to find a nu vertex?
             if (branches['RecoNuVtxZ'][iEvent] < -900) :
                 continue
-            
+                
             # Nu vertex vars - to work out separation
             dX = branches['RecoNuVtxX'][iEvent] - branches['NuX'][iEvent]
             dY = branches['RecoNuVtxY'][iEvent] - branches['NuY'][iEvent]
@@ -509,6 +518,12 @@ def readTreeGroupLinks_track(fileNames) :
             
             if (sep > 5.0) :
                 continue
+             
+            # To establish orientation of particles wrt the neutrino vertex
+            recoNuVertex = np.array([branches['RecoNuVtxX'][iEvent], branches['RecoNuVtxY'][iEvent], branches['RecoNuVtxZ'][iEvent]])
+                
+            # We don't want this to be masked, otherwise the indices will be wrong! 
+            trueVisibleGeneration_file = np.array(branches['RecoPFPTrueVisibleGeneration'][iEvent])
                 
             ##################################################################
             # DEFINE THEM ALL HERE - apply track-track mask
@@ -517,14 +532,11 @@ def readTreeGroupLinks_track(fileNames) :
             trackShowerLinkType_mask = (trackShowerLinkType_file == 0)
 
             if (np.count_nonzero(trackShowerLinkType_mask) == 0) :
-                continue                
+                continue      
             ##################################################################    
-            trackShowerLinkType_file = trackShowerLinkType_file[trackShowerLinkType_mask]
             parentIndex_file = np.array(branches['ParentPFPIndex'][iEvent][trackShowerLinkType_mask])
             childIndex_file = np.array(branches['ChildPFPIndex'][iEvent][trackShowerLinkType_mask])
             parentTrackScore_file = np.array(branches['ParentTrackScore'][iEvent][trackShowerLinkType_mask])
-            parentNuVertexSeparation_file = np.array(branches['ParentNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
-            childNuVertexSeparation_file = np.array(branches['ChildNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
             parentEndRegionNHits_file = np.array(branches['ParentEndRegionNHits'][iEvent][trackShowerLinkType_mask])
             parentEndRegionNParticles_file = np.array(branches['ParentEndRegionNParticles'][iEvent][trackShowerLinkType_mask])
             parentEndRegionRToWall_file = np.array(branches['ParentEndRegionRToWall'][iEvent][trackShowerLinkType_mask])
@@ -543,9 +555,39 @@ def readTreeGroupLinks_track(fileNames) :
             parentConnectionPointNHitRatio_file = np.array(branches['ParentConnectionPointNHitRatio'][iEvent][trackShowerLinkType_mask])
             parentConnectionPointEigenValueRatio_file = np.array(branches['ParentConnectionPointEigenValueRatio'][iEvent][trackShowerLinkType_mask])
             parentConnectionPointOpeningAngle_file = np.array(branches['ParentConnectionPointOpeningAngle'][iEvent][trackShowerLinkType_mask])
+            isParentPOIClosestToNu_file = np.array(branches['IsParentPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
+            isChildPOIClosestToNu_file = np.array(branches['IsChildPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
             pidLinkType_file = np.array(branches['PIDLinkType'][iEvent][trackShowerLinkType_mask])
             trueParentChildLink_file = np.array(branches['TrueParentChildLink'][iEvent][trackShowerLinkType_mask])
             isLinkOrientationCorrect_file = np.array(branches['IsLinkOrientationCorrect'][iEvent][trackShowerLinkType_mask])
+            # Topology 
+            childStartX_file = np.array(branches['ChildStartX'][iEvent][trackShowerLinkType_mask])
+            childStartY_file = np.array(branches['ChildStartY'][iEvent][trackShowerLinkType_mask])
+            childStartZ_file = np.array(branches['ChildStartZ'][iEvent][trackShowerLinkType_mask])
+            childStartDX_file = np.array(branches['ChildStartDX'][iEvent][trackShowerLinkType_mask])
+            childStartDY_file = np.array(branches['ChildStartDY'][iEvent][trackShowerLinkType_mask])
+            childStartDZ_file = np.array(branches['ChildStartDZ'][iEvent][trackShowerLinkType_mask])
+            parentEndX_file = np.array(branches['ParentEndX'][iEvent][trackShowerLinkType_mask])
+            parentEndY_file = np.array(branches['ParentEndY'][iEvent][trackShowerLinkType_mask])
+            parentEndZ_file = np.array(branches['ParentEndZ'][iEvent][trackShowerLinkType_mask])
+            parentEndDX_file = np.array(branches['ParentEndDX'][iEvent][trackShowerLinkType_mask])
+            parentEndDY_file = np.array(branches['ParentEndDY'][iEvent][trackShowerLinkType_mask])
+            parentEndDZ_file = np.array(branches['ParentEndDZ'][iEvent][trackShowerLinkType_mask])
+            # Training cuts!
+            trainingCutL_file = np.array(branches['TrainingCutL'][iEvent][trackShowerLinkType_mask])
+            trainingCutT_file = np.array(branches['TrainingCutT'][iEvent][trackShowerLinkType_mask])
+            
+#             print('parentIndex_file:', parentIndex_file)
+#             print('childIndex_file:', childIndex_file)
+#             print('PrimaryTrackScore[2]:', branches['RecoPFPTrackShowerScore'][iEvent][2])
+#             print('PrimaryTrackScore[5]:', branches['RecoPFPTrackShowerScore'][iEvent][5])
+#             print('run:', branches['Run'][iEvent])
+#             print('event:', branches['Event'][iEvent])
+            
+# #             index = np.where(np.logical_and(parentIndex_file == 2, childIndex_file == 34))[0][0]
+            
+#             print(np.array(branches['TrackShowerLinkType'][iEvent][index]))
+            
             ##################################################################
             # DEFINE THEM ALL HERE - apply generation mask
             ##################################################################
@@ -559,12 +601,9 @@ def readTreeGroupLinks_track(fileNames) :
             if (np.count_nonzero(trainingChild_mask) == 0) :
                 continue
             
-            trackShowerLinkType_file = trackShowerLinkType_file[trainingChild_mask]
             parentIndex_file = parentIndex_file[trainingChild_mask]
             childIndex_file = childIndex_file[trainingChild_mask]
             parentTrackScore_file = parentTrackScore_file[trainingChild_mask]
-            parentNuVertexSeparation_file = parentNuVertexSeparation_file[trainingChild_mask]
-            childNuVertexSeparation_file = childNuVertexSeparation_file[trainingChild_mask]
             parentEndRegionNHits_file = parentEndRegionNHits_file[trainingChild_mask]
             parentEndRegionNParticles_file = parentEndRegionNParticles_file[trainingChild_mask]
             parentEndRegionRToWall_file = parentEndRegionRToWall_file[trainingChild_mask]
@@ -583,9 +622,27 @@ def readTreeGroupLinks_track(fileNames) :
             parentConnectionPointNHitRatio_file = parentConnectionPointNHitRatio_file[trainingChild_mask]
             parentConnectionPointEigenValueRatio_file = parentConnectionPointEigenValueRatio_file[trainingChild_mask]
             parentConnectionPointOpeningAngle_file = parentConnectionPointOpeningAngle_file[trainingChild_mask]
+            isParentPOIClosestToNu_file = isParentPOIClosestToNu_file[trainingChild_mask]
+            isChildPOIClosestToNu_file = isChildPOIClosestToNu_file[trainingChild_mask]
             pidLinkType_file = pidLinkType_file[trainingChild_mask]
             trueParentChildLink_file = trueParentChildLink_file[trainingChild_mask]
-            isLinkOrientationCorrect_file = isLinkOrientationCorrect_file[trainingChild_mask]            
+            isLinkOrientationCorrect_file = isLinkOrientationCorrect_file[trainingChild_mask] 
+            # Topology
+            childStartX_file = childStartX_file[trainingChild_mask]
+            childStartY_file = childStartY_file[trainingChild_mask]
+            childStartZ_file = childStartZ_file[trainingChild_mask]
+            childStartDX_file = childStartDX_file[trainingChild_mask]
+            childStartDY_file = childStartDY_file[trainingChild_mask]
+            childStartDZ_file = childStartDZ_file[trainingChild_mask]
+            parentEndX_file = parentEndX_file[trainingChild_mask]
+            parentEndY_file = parentEndY_file[trainingChild_mask]
+            parentEndZ_file = parentEndZ_file[trainingChild_mask]
+            parentEndDX_file = parentEndDX_file[trainingChild_mask]
+            parentEndDY_file = parentEndDY_file[trainingChild_mask]
+            parentEndDZ_file = parentEndDZ_file[trainingChild_mask]
+            # Training cuts!
+            trainingCutL_file = trainingCutL_file[trainingChild_mask]
+            trainingCutT_file = trainingCutT_file[trainingChild_mask]
             
             ####################################
             # Now loop over loops to group them.
@@ -600,20 +657,27 @@ def readTreeGroupLinks_track(fileNames) :
                 order = [0, 1, 2, 3]
 
                 for iLink in range(0, parentIndex_file.shape[0]) :
+                    
+                    if len(np.where(np.logical_and(parentIndex_file == parentIndex_file[iLink], childIndex_file == childIndex_file[iLink]))[0]) != 4 :
+                        continue
 
                     # If we have moved onto a new group...
                     if ((currentParent != parentIndex_file[iLink]) or (currentChild != childIndex_file[iLink])) :
+                        
+                        if (linksMadeCounter != 0) and (linksMadeCounter != 4) :
+                            print('FAILURE ON IEVENT:', iEvent)
+                            raise
+                        
                         # set the common vars
                         parentTrackScore.append(parentTrackScore_file[iLink])
-                        parentNuVertexSeparation.append(parentNuVertexSeparation_file[iLink])
-                        childNuVertexSeparation.append(childNuVertexSeparation_file[iLink])
                         separation3D.append(separation3D_file[iLink])
                         pidLinkType.append(pidLinkType_file[iLink])
-                        trackShowerLinkType.append(trackShowerLinkType_file[iLink])
                         trueParentChildLink.append(trueParentChildLink_file[iLink])
                         
                         currentParent = parentIndex_file[iLink]
                         currentChild = childIndex_file[iLink]
+                        trueParentVisibleGeneration.append(trueVisibleGeneration_file[currentParent])
+                        trueChildVisibleGeneration.append(trueVisibleGeneration_file[currentChild])
                     
                     # Set truth
                     if (trueParentChildLink_file[iLink] and isLinkOrientationCorrect_file[iLink]) :
@@ -641,7 +705,16 @@ def readTreeGroupLinks_track(fileNames) :
                     parentConnectionPointNHitRatio[order[linksMadeCounter]].append(parentConnectionPointNHitRatio_file[iLink])
                     parentConnectionPointEigenValueRatio[order[linksMadeCounter]].append(parentConnectionPointEigenValueRatio_file[iLink])
                     parentConnectionPointOpeningAngle[order[linksMadeCounter]].append(parentConnectionPointOpeningAngle_file[iLink])
+                    parentIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isParentPOIClosestToNu_file[iLink] else 0)
+                    childIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isChildPOIClosestToNu_file[iLink] else 0)
                     
+                    # Add in training cuts 
+                    if (isLinkOrientationCorrect_file[iLink]) :
+                        trainingCutSep.append(separation3D_file[iLink])
+                        trainingCutDoesConnect.append(doesChildConnect_file[iLink])
+                        trainingCutL.append(trainingCutL_file[iLink])
+                        trainingCutT.append(trainingCutT_file[iLink])
+
                     linksMadeCounter = linksMadeCounter + 1
                     
                     if (linksMadeCounter == 4) :
@@ -659,8 +732,6 @@ def readTreeGroupLinks_track(fileNames) :
     ###################################
     # Node variables
     parentTrackScore = np.array(parentTrackScore)
-    parentNuVertexSeparation = np.array(parentNuVertexSeparation)
-    childNuVertexSeparation = np.array(childNuVertexSeparation)
     parentEndRegionNHits = np.array(parentEndRegionNHits)
     parentEndRegionNParticles = np.array(parentEndRegionNParticles)
     parentEndRegionRToWall = np.array(parentEndRegionRToWall)
@@ -679,9 +750,17 @@ def readTreeGroupLinks_track(fileNames) :
     parentConnectionPointNHitRatio = np.array(parentConnectionPointNHitRatio)
     parentConnectionPointEigenValueRatio = np.array(parentConnectionPointEigenValueRatio)
     parentConnectionPointOpeningAngle = np.array(parentConnectionPointOpeningAngle)
+    parentIsPOIClosestToNu = np.array(parentIsPOIClosestToNu, dtype='int')
+    childIsPOIClosestToNu = np.array(childIsPOIClosestToNu, dtype='int')
     pidLinkType = np.array(pidLinkType)
-    trackShowerLinkType = np.array(trackShowerLinkType)
+    # Training cut variables
+    trainingCutSep = np.array(trainingCutSep)
+    trainingCutDoesConnect = np.array(trainingCutDoesConnect, dtype='int')
+    trainingCutL = np.array(trainingCutL)
+    trainingCutT = np.array(trainingCutT)
     # Truth 
+    trueParentVisibleGeneration = np.array(trueParentVisibleGeneration, dtype='int')
+    trueChildVisibleGeneration = np.array(trueChildVisibleGeneration, dtype='int')
     trueParentChildLink = np.array(trueParentChildLink, dtype='int')
     isLinkOrientationCorrect = np.array(isLinkOrientationCorrect, dtype='int')
     y = np.array(y, dtype='int')
@@ -696,8 +775,6 @@ def readTreeGroupLinks_track(fileNames) :
     # Normalise variables
     ###################################
     normaliseXAxis(parentTrackScore,parentTrackScore_min, parentTrackScore_max)
-    normaliseXAxis(parentNuVertexSeparation, parentNuVertexSeparation_min, parentNuVertexSeparation_max)
-    normaliseXAxis(childNuVertexSeparation, childNuVertexSeparation_min, childNuVertexSeparation_max)
     normaliseXAxis(parentEndRegionNHits, parentEndRegionNHits_min, parentEndRegionNHits_max)
     normaliseXAxis(parentEndRegionNParticles, parentEndRegionNParticles_min, parentEndRegionNParticles_max)
     normaliseXAxis(parentEndRegionRToWall, parentEndRegionRToWall_min, parentEndRegionRToWall_max)
@@ -717,7 +794,6 @@ def readTreeGroupLinks_track(fileNames) :
     normaliseXAxis(parentConnectionPointEigenValueRatio, parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
     normaliseXAxis(parentConnectionPointOpeningAngle, parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
     normaliseXAxis(pidLinkType, pidLinkType_min, pidLinkType_max)
-    normaliseXAxis(trackShowerLinkType, trackShowerLinkType_min, trackShowerLinkType_max)
 
     ###################################
     # Concatenate
@@ -738,7 +814,9 @@ def readTreeGroupLinks_track(fileNames) :
                                            parentConnectionPointNDownstreamHits[0, :].reshape(nLinks, 1), \
                                            parentConnectionPointNHitRatio[0, :].reshape(nLinks, 1), \
                                            parentConnectionPointEigenValueRatio[0, :].reshape(nLinks, 1), \
-                                           parentConnectionPointOpeningAngle[0, :].reshape(nLinks, 1)), axis=1), \
+                                           parentConnectionPointOpeningAngle[0, :].reshape(nLinks, 1), \
+                                           parentIsPOIClosestToNu[0, :].reshape(nLinks, 1), \
+                                           childIsPOIClosestToNu[0, :].reshape(nLinks, 1)), axis=1), \
                            np.concatenate((parentEndRegionNHits[1, :].reshape(nLinks, 1), \
                                            parentEndRegionNParticles[1, :].reshape(nLinks, 1), \
                                            parentEndRegionRToWall[1, :].reshape(nLinks, 1), \
@@ -755,7 +833,9 @@ def readTreeGroupLinks_track(fileNames) :
                                            parentConnectionPointNDownstreamHits[1, :].reshape(nLinks, 1), \
                                            parentConnectionPointNHitRatio[1, :].reshape(nLinks, 1), \
                                            parentConnectionPointEigenValueRatio[1, :].reshape(nLinks, 1), \
-                                           parentConnectionPointOpeningAngle[1, :].reshape(nLinks, 1)), axis=1), \
+                                           parentConnectionPointOpeningAngle[1, :].reshape(nLinks, 1), \
+                                           parentIsPOIClosestToNu[1, :].reshape(nLinks, 1), \
+                                           childIsPOIClosestToNu[1, :].reshape(nLinks, 1)), axis=1), \
                            np.concatenate((parentEndRegionNHits[2, :].reshape(nLinks, 1), \
                                            parentEndRegionNParticles[2, :].reshape(nLinks, 1), \
                                            parentEndRegionRToWall[2, :].reshape(nLinks, 1), \
@@ -772,7 +852,9 @@ def readTreeGroupLinks_track(fileNames) :
                                            parentConnectionPointNDownstreamHits[2, :].reshape(nLinks, 1), \
                                            parentConnectionPointNHitRatio[2, :].reshape(nLinks, 1), \
                                            parentConnectionPointEigenValueRatio[2, :].reshape(nLinks, 1), \
-                                           parentConnectionPointOpeningAngle[2, :].reshape(nLinks, 1)), axis=1), \
+                                           parentConnectionPointOpeningAngle[2, :].reshape(nLinks, 1), \
+                                           parentIsPOIClosestToNu[2, :].reshape(nLinks, 1), \
+                                           childIsPOIClosestToNu[2, :].reshape(nLinks, 1)), axis=1), \
                            np.concatenate((parentEndRegionNHits[3, :].reshape(nLinks, 1), \
                                            parentEndRegionNParticles[3, :].reshape(nLinks, 1), \
                                            parentEndRegionRToWall[3, :].reshape(nLinks, 1), \
@@ -789,32 +871,27 @@ def readTreeGroupLinks_track(fileNames) :
                                            parentConnectionPointNDownstreamHits[3, :].reshape(nLinks, 1), \
                                            parentConnectionPointNHitRatio[3, :].reshape(nLinks, 1), \
                                            parentConnectionPointEigenValueRatio[3, :].reshape(nLinks, 1), \
-                                           parentConnectionPointOpeningAngle[3, :].reshape(nLinks, 1)), axis=1)), axis=1)
-
+                                           parentConnectionPointOpeningAngle[3, :].reshape(nLinks, 1), \
+                                           parentIsPOIClosestToNu[3, :].reshape(nLinks, 1), \
+                                           childIsPOIClosestToNu[3, :].reshape(nLinks, 1)), axis=1)), axis=1)
     # concatenate variable_single and orientations
     variables = np.concatenate((parentTrackScore.reshape(nLinks, 1), \
-                                parentNuVertexSeparation.reshape(nLinks, 1), \
-                                childNuVertexSeparation.reshape(nLinks, 1), \
                                 separation3D.reshape(nLinks, 1), \
                                 pidLinkType.reshape(nLinks, 1), \
-                                trackShowerLinkType.reshape(nLinks, 1), \
                                 coc0), axis=1)
-
     
-    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect
+    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect, trueParentVisibleGeneration, trueChildVisibleGeneration, trainingCutSep, trainingCutDoesConnect, trainingCutL, trainingCutT
 
 ############################################################################################################################################
 ############################################################################################################################################
 
 def readTreeGroupLinks_shower(fileNames) :
-        
+
     ###################################
     # To pull out of tree
     ###################################
     # Link variables
     parentTrackScore = []
-    parentNuVertexSeparation = []
-    childNuVertexSeparation = []
     parentEndRegionNHits = [[], []]
     parentEndRegionNParticles = [[], []]
     parentEndRegionRToWall = [[], []]
@@ -833,12 +910,20 @@ def readTreeGroupLinks_shower(fileNames) :
     parentConnectionPointNHitRatio = [[], []]
     parentConnectionPointEigenValueRatio = [[], []]
     parentConnectionPointOpeningAngle = [[], []]
+    parentIsPOIClosestToNu = [[], []]
+    childIsPOIClosestToNu = [[], []]
     pidLinkType = []
-    trackShowerLinkType = []
+    # Training cut variables
+    trainingCutSep = []
+    trainingCutDoesConnect = []
+    trainingCutL = []
+    trainingCutT = []
     # Truth
     trueParentChildLink = []
     isLinkOrientationCorrect = []
     y = []
+    trueParentVisibleGeneration = []
+    trueChildVisibleGeneration = []
     
     for fileName in fileNames :
         print('Reading tree: ', str(fileName),', This may take a while...')
@@ -850,6 +935,9 @@ def readTreeGroupLinks_shower(fileNames) :
         nEvents = len(branches)
         
         for iEvent in range(nEvents) :
+            
+            if ((iEvent % 100) == 0) :
+                print('iEvent:', str(iEvent) + '/' + str(nEvents))
             
             # Failed to find a nu vertex?
             if (branches['RecoNuVtxZ'][iEvent] < -900) :
@@ -864,6 +952,12 @@ def readTreeGroupLinks_shower(fileNames) :
             if (sep > 5.0) :
                 continue
                 
+            # To establish orientation of particles wrt the neutrino vertex
+            recoNuVertex = np.array([branches['RecoNuVtxX'][iEvent], branches['RecoNuVtxY'][iEvent], branches['RecoNuVtxZ'][iEvent]])
+                
+            # We don't want this to be masked, otherwise the indices will be wrong! 
+            trueVisibleGeneration_file = np.array(branches['RecoPFPTrueVisibleGeneration'][iEvent])                
+                
             ##################################################################
             # DEFINE THEM ALL HERE - apply track-track or track-shower mask
             ##################################################################
@@ -872,13 +966,11 @@ def readTreeGroupLinks_shower(fileNames) :
                 
             if (np.count_nonzero(trackShowerLinkType_mask) == 0) :
                 continue
+                
             ##################################################################    
-            trackShowerLinkType_file = trackShowerLinkType_file[trackShowerLinkType_mask]
             parentIndex_file = np.array(branches['ParentPFPIndex'][iEvent][trackShowerLinkType_mask])
             childIndex_file = np.array(branches['ChildPFPIndex'][iEvent][trackShowerLinkType_mask])
             parentTrackScore_file = np.array(branches['ParentTrackScore'][iEvent][trackShowerLinkType_mask])
-            parentNuVertexSeparation_file = np.array(branches['ParentNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
-            childNuVertexSeparation_file = np.array(branches['ChildNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
             parentEndRegionNHits_file = np.array(branches['ParentEndRegionNHits'][iEvent][trackShowerLinkType_mask])
             parentEndRegionNParticles_file = np.array(branches['ParentEndRegionNParticles'][iEvent][trackShowerLinkType_mask])
             parentEndRegionRToWall_file = np.array(branches['ParentEndRegionRToWall'][iEvent][trackShowerLinkType_mask])
@@ -897,9 +989,27 @@ def readTreeGroupLinks_shower(fileNames) :
             parentConnectionPointNHitRatio_file = np.array(branches['ParentConnectionPointNHitRatio'][iEvent][trackShowerLinkType_mask])
             parentConnectionPointEigenValueRatio_file = np.array(branches['ParentConnectionPointEigenValueRatio'][iEvent][trackShowerLinkType_mask])
             parentConnectionPointOpeningAngle_file = np.array(branches['ParentConnectionPointOpeningAngle'][iEvent][trackShowerLinkType_mask])
+            isParentPOIClosestToNu_file = np.array(branches['IsParentPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
+            isChildPOIClosestToNu_file = np.array(branches['IsChildPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
             pidLinkType_file = np.array(branches['PIDLinkType'][iEvent][trackShowerLinkType_mask])
             trueParentChildLink_file = np.array(branches['TrueParentChildLink'][iEvent][trackShowerLinkType_mask])
             isLinkOrientationCorrect_file = np.array(branches['IsLinkOrientationCorrect'][iEvent][trackShowerLinkType_mask])
+            # Topology 
+            childStartX_file = np.array(branches['ChildStartX'][iEvent][trackShowerLinkType_mask])
+            childStartY_file = np.array(branches['ChildStartY'][iEvent][trackShowerLinkType_mask])
+            childStartZ_file = np.array(branches['ChildStartZ'][iEvent][trackShowerLinkType_mask])
+            childStartDX_file = np.array(branches['ChildStartDX'][iEvent][trackShowerLinkType_mask])
+            childStartDY_file = np.array(branches['ChildStartDY'][iEvent][trackShowerLinkType_mask])
+            childStartDZ_file = np.array(branches['ChildStartDZ'][iEvent][trackShowerLinkType_mask])
+            parentEndX_file = np.array(branches['ParentEndX'][iEvent][trackShowerLinkType_mask])
+            parentEndY_file = np.array(branches['ParentEndY'][iEvent][trackShowerLinkType_mask])
+            parentEndZ_file = np.array(branches['ParentEndZ'][iEvent][trackShowerLinkType_mask])
+            parentEndDX_file = np.array(branches['ParentEndDX'][iEvent][trackShowerLinkType_mask])
+            parentEndDY_file = np.array(branches['ParentEndDY'][iEvent][trackShowerLinkType_mask])
+            parentEndDZ_file = np.array(branches['ParentEndDZ'][iEvent][trackShowerLinkType_mask])
+            # Training cuts!
+            trainingCutL_file = np.array(branches['TrainingCutL'][iEvent][trackShowerLinkType_mask])
+            trainingCutT_file = np.array(branches['TrainingCutT'][iEvent][trackShowerLinkType_mask])
             ##################################################################
             # DEFINE THEM ALL HERE - apply generation mask
             ##################################################################
@@ -913,12 +1023,9 @@ def readTreeGroupLinks_shower(fileNames) :
             if (np.count_nonzero(trainingChild_mask) == 0) :
                 continue
             
-            trackShowerLinkType_file = trackShowerLinkType_file[trainingChild_mask]
             parentIndex_file = parentIndex_file[trainingChild_mask]
             childIndex_file = childIndex_file[trainingChild_mask]
             parentTrackScore_file = parentTrackScore_file[trainingChild_mask]
-            parentNuVertexSeparation_file = parentNuVertexSeparation_file[trainingChild_mask]
-            childNuVertexSeparation_file = childNuVertexSeparation_file[trainingChild_mask]
             parentEndRegionNHits_file = parentEndRegionNHits_file[trainingChild_mask]
             parentEndRegionNParticles_file = parentEndRegionNParticles_file[trainingChild_mask]
             parentEndRegionRToWall_file = parentEndRegionRToWall_file[trainingChild_mask]
@@ -937,9 +1044,27 @@ def readTreeGroupLinks_shower(fileNames) :
             parentConnectionPointNHitRatio_file = parentConnectionPointNHitRatio_file[trainingChild_mask]
             parentConnectionPointEigenValueRatio_file = parentConnectionPointEigenValueRatio_file[trainingChild_mask]
             parentConnectionPointOpeningAngle_file = parentConnectionPointOpeningAngle_file[trainingChild_mask]
+            isParentPOIClosestToNu_file = isParentPOIClosestToNu_file[trainingChild_mask]
+            isChildPOIClosestToNu_file = isChildPOIClosestToNu_file[trainingChild_mask]
             pidLinkType_file = pidLinkType_file[trainingChild_mask]
             trueParentChildLink_file = trueParentChildLink_file[trainingChild_mask]
             isLinkOrientationCorrect_file = isLinkOrientationCorrect_file[trainingChild_mask]
+            # Topology
+            childStartX_file = childStartX_file[trainingChild_mask]
+            childStartY_file = childStartY_file[trainingChild_mask]
+            childStartZ_file = childStartZ_file[trainingChild_mask]
+            childStartDX_file = childStartDX_file[trainingChild_mask]
+            childStartDY_file = childStartDY_file[trainingChild_mask]
+            childStartDZ_file = childStartDZ_file[trainingChild_mask]
+            parentEndX_file = parentEndX_file[trainingChild_mask]
+            parentEndY_file = parentEndY_file[trainingChild_mask]
+            parentEndZ_file = parentEndZ_file[trainingChild_mask]
+            parentEndDX_file = parentEndDX_file[trainingChild_mask]
+            parentEndDY_file = parentEndDY_file[trainingChild_mask]
+            parentEndDZ_file = parentEndDZ_file[trainingChild_mask]
+            # Training cuts!
+            trainingCutL_file = trainingCutL_file[trainingChild_mask]
+            trainingCutT_file = trainingCutT_file[trainingChild_mask]
             
             ####################################
             # Now loop over loops to group them.
@@ -954,20 +1079,20 @@ def readTreeGroupLinks_shower(fileNames) :
                 order = [0, 1]
 
                 for iLink in range(0, parentIndex_file.shape[0]) :
-
+                    
                     # If we have moved onto a new group...
                     if ((currentParent != parentIndex_file[iLink]) or (currentChild != childIndex_file[iLink])) :
+                            
                         # set the common vars
                         parentTrackScore.append(parentTrackScore_file[iLink])
-                        parentNuVertexSeparation.append(parentNuVertexSeparation_file[iLink])
-                        childNuVertexSeparation.append(childNuVertexSeparation_file[iLink])
                         separation3D.append(separation3D_file[iLink])
                         pidLinkType.append(pidLinkType_file[iLink])
-                        trackShowerLinkType.append(trackShowerLinkType_file[iLink])
                         trueParentChildLink.append(trueParentChildLink_file[iLink])
                         
                         currentParent = parentIndex_file[iLink]
                         currentChild = childIndex_file[iLink]
+                        trueParentVisibleGeneration.append(trueVisibleGeneration_file[currentParent])
+                        trueChildVisibleGeneration.append(trueVisibleGeneration_file[currentChild])                    
                     
                     # Set truth
                     if (trueParentChildLink_file[iLink] and isLinkOrientationCorrect_file[iLink]) :
@@ -995,6 +1120,15 @@ def readTreeGroupLinks_shower(fileNames) :
                     parentConnectionPointNHitRatio[order[linksMadeCounter]].append(parentConnectionPointNHitRatio_file[iLink])
                     parentConnectionPointEigenValueRatio[order[linksMadeCounter]].append(parentConnectionPointEigenValueRatio_file[iLink])
                     parentConnectionPointOpeningAngle[order[linksMadeCounter]].append(parentConnectionPointOpeningAngle_file[iLink])
+                    parentIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isParentPOIClosestToNu_file[iLink] else 0)
+                    childIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isChildPOIClosestToNu_file[iLink] else 0)
+
+                    # Calculate training cuts 
+                    if (isLinkOrientationCorrect_file[iLink]) :
+                        trainingCutSep.append(separation3D_file[iLink])
+                        trainingCutDoesConnect.append(doesChildConnect_file[iLink])
+                        trainingCutL.append(trainingCutL_file[iLink])
+                        trainingCutT.append(trainingCutT_file[iLink])
                     
                     linksMadeCounter = linksMadeCounter + 1
                     
@@ -1013,8 +1147,6 @@ def readTreeGroupLinks_shower(fileNames) :
     ###################################
     # Node variables
     parentTrackScore = np.array(parentTrackScore)
-    parentNuVertexSeparation = np.array(parentNuVertexSeparation)
-    childNuVertexSeparation = np.array(childNuVertexSeparation)
     parentEndRegionNHits = np.array(parentEndRegionNHits)
     parentEndRegionNParticles = np.array(parentEndRegionNParticles)
     parentEndRegionRToWall = np.array(parentEndRegionRToWall)
@@ -1033,9 +1165,17 @@ def readTreeGroupLinks_shower(fileNames) :
     parentConnectionPointNHitRatio = np.array(parentConnectionPointNHitRatio)
     parentConnectionPointEigenValueRatio = np.array(parentConnectionPointEigenValueRatio)
     parentConnectionPointOpeningAngle = np.array(parentConnectionPointOpeningAngle)
+    parentIsPOIClosestToNu = np.array(parentIsPOIClosestToNu, dtype='int')
+    childIsPOIClosestToNu = np.array(childIsPOIClosestToNu, dtype='int')
     pidLinkType = np.array(pidLinkType)
-    trackShowerLinkType = np.array(trackShowerLinkType)
+    # Training cut variables
+    trainingCutSep = np.array(trainingCutSep)
+    trainingCutDoesConnect = np.array(trainingCutDoesConnect, dtype='int')
+    trainingCutL = np.array(trainingCutL)
+    trainingCutT = np.array(trainingCutT)
     # Truth 
+    trueParentVisibleGeneration = np.array(trueParentVisibleGeneration, dtype='int')
+    trueChildVisibleGeneration = np.array(trueChildVisibleGeneration, dtype='int')
     trueParentChildLink = np.array(trueParentChildLink, dtype='int')
     isLinkOrientationCorrect = np.array(isLinkOrientationCorrect, dtype='int')
     y = np.array(y, dtype='int')
@@ -1049,9 +1189,7 @@ def readTreeGroupLinks_shower(fileNames) :
     ###################################
     # Normalise variables
     ###################################
-    normaliseXAxis(parentTrackScore,parentTrackScore_min, parentTrackScore_max)
-    normaliseXAxis(parentNuVertexSeparation, parentNuVertexSeparation_min, parentNuVertexSeparation_max)
-    normaliseXAxis(childNuVertexSeparation, childNuVertexSeparation_min, childNuVertexSeparation_max)
+    normaliseXAxis(parentTrackScore, parentTrackScore_min, parentTrackScore_max)
     normaliseXAxis(parentEndRegionNHits, parentEndRegionNHits_min, parentEndRegionNHits_max)
     normaliseXAxis(parentEndRegionNParticles, parentEndRegionNParticles_min, parentEndRegionNParticles_max)
     normaliseXAxis(parentEndRegionRToWall, parentEndRegionRToWall_min, parentEndRegionRToWall_max)
@@ -1071,7 +1209,6 @@ def readTreeGroupLinks_shower(fileNames) :
     normaliseXAxis(parentConnectionPointEigenValueRatio, parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
     normaliseXAxis(parentConnectionPointOpeningAngle, parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
     normaliseXAxis(pidLinkType, pidLinkType_min, pidLinkType_max)
-    normaliseXAxis(trackShowerLinkType, trackShowerLinkType_min, trackShowerLinkType_max)
 
     ###################################
     # Concatenate
@@ -1092,7 +1229,9 @@ def readTreeGroupLinks_shower(fileNames) :
                                            parentConnectionPointNDownstreamHits[0, :].reshape(nLinks, 1), \
                                            parentConnectionPointNHitRatio[0, :].reshape(nLinks, 1), \
                                            parentConnectionPointEigenValueRatio[0, :].reshape(nLinks, 1), \
-                                           parentConnectionPointOpeningAngle[0, :].reshape(nLinks, 1)), axis=1), \
+                                           parentConnectionPointOpeningAngle[0, :].reshape(nLinks, 1), \
+                                           parentIsPOIClosestToNu[0, :].reshape(nLinks, 1), \
+                                           childIsPOIClosestToNu[0, :].reshape(nLinks, 1)), axis=1), \
                            np.concatenate((parentEndRegionNHits[1, :].reshape(nLinks, 1), \
                                            parentEndRegionNParticles[1, :].reshape(nLinks, 1), \
                                            parentEndRegionRToWall[1, :].reshape(nLinks, 1), \
@@ -1109,31 +1248,29 @@ def readTreeGroupLinks_shower(fileNames) :
                                            parentConnectionPointNDownstreamHits[1, :].reshape(nLinks, 1), \
                                            parentConnectionPointNHitRatio[1, :].reshape(nLinks, 1), \
                                            parentConnectionPointEigenValueRatio[1, :].reshape(nLinks, 1), \
-                                           parentConnectionPointOpeningAngle[1, :].reshape(nLinks, 1)), axis=1)), axis=1)
+                                           parentConnectionPointOpeningAngle[1, :].reshape(nLinks, 1), \
+                                           parentIsPOIClosestToNu[1, :].reshape(nLinks, 1), \
+                                           childIsPOIClosestToNu[1, :].reshape(nLinks, 1)), axis=1)), axis=1)
 
     # concatenate variable_single and orientations
     variables = np.concatenate((parentTrackScore.reshape(nLinks, 1), \
-                                parentNuVertexSeparation.reshape(nLinks, 1), \
-                                childNuVertexSeparation.reshape(nLinks, 1), \
                                 separation3D.reshape(nLinks, 1), \
                                 pidLinkType.reshape(nLinks, 1), \
-                                trackShowerLinkType.reshape(nLinks, 1), \
                                 coc0), axis=1)
-
     
-    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect
+    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect, trueParentVisibleGeneration, trueChildVisibleGeneration, trainingCutSep, trainingCutDoesConnect, trainingCutL, trainingCutT
 
 ############################################################################################################################################
 ############################################################################################################################################    
 
 def readEvent(eventDict) :
     
+    separation3D_notNorm = eventDict['separation3D'].copy()
+    
     ###################################
     # Need to normalise!
     ###################################    
     normaliseXAxis(eventDict['parentTrackScore'], parentTrackScore_min, parentTrackScore_max)
-    normaliseXAxis(eventDict['parentNuVertexSeparation'], parentNuVertexSeparation_min, parentNuVertexSeparation_max)
-    normaliseXAxis(eventDict['childNuVertexSeparation'], childNuVertexSeparation_min, childNuVertexSeparation_max)
     normaliseXAxis(eventDict['parentEndRegionNHits'], parentEndRegionNHits_min, parentEndRegionNHits_max)
     normaliseXAxis(eventDict['parentEndRegionNParticles'], parentEndRegionNParticles_min, parentEndRegionNParticles_max)
     normaliseXAxis(eventDict['parentEndRegionRToWall'], parentEndRegionRToWall_min, parentEndRegionRToWall_max)
@@ -1153,7 +1290,10 @@ def readEvent(eventDict) :
     normaliseXAxis(eventDict['parentConnectionPointEigenValueRatio'], parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
     normaliseXAxis(eventDict['parentConnectionPointOpeningAngle'], parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
     normaliseXAxis(eventDict['pidLinkType'], pidLinkType_min, pidLinkType_max)
-    normaliseXAxis(eventDict['trackShowerLinkType'], trackShowerLinkType_min, trackShowerLinkType_max)
+    #normaliseXAxis(eventDict['trackShowerLinkType'], trackShowerLinkType_min, trackShowerLinkType_max)
+        
+    # To establish orientation of particles wrt the neutrino vertex
+    recoNuVertex = np.array([eventDict['recoNuX'], eventDict['recoNuY'], eventDict['recoNuZ']])
         
     ###################################
     # track-track links
@@ -1163,8 +1303,6 @@ def readEvent(eventDict) :
     childPFPIndex_track = []
     # Link variables
     parentTrackScore_track = []
-    parentNuVertexSeparation_track = []
-    childNuVertexSeparation_track = []
     parentEndRegionNHits_track = [[], [], [], []]
     parentEndRegionNParticles_track = [[], [], [], []]
     parentEndRegionRToWall_track = [[], [], [], []]
@@ -1183,8 +1321,13 @@ def readEvent(eventDict) :
     parentConnectionPointNHitRatio_track = [[], [], [], []]
     parentConnectionPointEigenValueRatio_track = [[], [], [], []]
     parentConnectionPointOpeningAngle_track = [[], [], [], []]
-    pidLinkType_track = []
-    trackShowerLinkType_track = []
+    pidLinkType_track = []  
+    parentIsPOIClosestToNu_track = [[], [], [], []]
+    childIsPOIClosestToNu_track = [[], [], [], []]
+    # Training cut variables
+    trainingCutSep_track = []
+    trainingCutL_track = []
+    trainingCutT_track = []
     # Truth
     trueParentChildLink_track = []
     y_track = []
@@ -1196,8 +1339,6 @@ def readEvent(eventDict) :
     childPFPIndex_shower = []
     # Link variables
     parentTrackScore_shower = []
-    parentNuVertexSeparation_shower = []
-    childNuVertexSeparation_shower = []
     parentEndRegionNHits_shower = [[], []]
     parentEndRegionNParticles_shower = [[], []]
     parentEndRegionRToWall_shower = [[], []]
@@ -1217,7 +1358,12 @@ def readEvent(eventDict) :
     parentConnectionPointEigenValueRatio_shower = [[], []]
     parentConnectionPointOpeningAngle_shower = [[], []]
     pidLinkType_shower = []
-    trackShowerLinkType_shower = []
+    parentIsPOIClosestToNu_shower = [[], []]
+    childIsPOIClosestToNu_shower = [[], []]
+    # Training cut variables
+    trainingCutSep_shower = []
+    trainingCutL_shower = []
+    trainingCutT_shower = []
     # Truth
     trueParentChildLink_shower = []
     y_shower = []
@@ -1230,14 +1376,23 @@ def readEvent(eventDict) :
     linksMadeCounter = 0                
     this_y_track = [0, 0, 0, 0]
     this_y_shower = [0, 0]
-
+    
     for iLink in range(eventDict['parentPFPIndex'].shape[0]) :
 
         trackShowerLinkType_event = eventDict['trackShowerLinkType'][iLink]
-        isTrack = (trackShowerLinkType_event > -0.00009) and (trackShowerLinkType_event < 0.1) # because things have been normalised -.-
+        isTrack = (trackShowerLinkType_event == 0)
             
         # If we have moved onto a new group...
         if ((currentParent != eventDict['parentPFPIndex'][iLink]) or (currentChild != eventDict['childPFPIndex'][iLink])) :
+            
+            # Make sure that it has all of its orientations in the tree
+            if isTrack and len(np.where(np.logical_and(eventDict['parentPFPIndex'] == eventDict['parentPFPIndex'][iLink], eventDict['childPFPIndex'] == eventDict['childPFPIndex'][iLink]))[0]) != 4 :
+                continue
+                
+            # Make sure that it has all of its orientations in the tree
+            if (not isTrack) and len(np.where(np.logical_and(eventDict['parentPFPIndex'] == eventDict['parentPFPIndex'][iLink], eventDict['childPFPIndex'] == eventDict['childPFPIndex'][iLink]))[0]) != 2 :
+                continue
+            
             # set the common vars
             parentPFPIndex_track.append(eventDict['parentPFPIndex'][iLink]) if isTrack else \
                 parentPFPIndex_shower.append(eventDict['parentPFPIndex'][iLink])
@@ -1246,16 +1401,10 @@ def readEvent(eventDict) :
             
             parentTrackScore_track.append(eventDict['parentTrackScore'][iLink]) if isTrack else \
                 parentTrackScore_shower.append(eventDict['parentTrackScore'][iLink])
-            parentNuVertexSeparation_track.append(eventDict['parentNuVertexSeparation'][iLink]) if isTrack else \
-                parentNuVertexSeparation_shower.append(eventDict['parentNuVertexSeparation'][iLink])
-            childNuVertexSeparation_track.append(eventDict['childNuVertexSeparation'][iLink]) if isTrack else \
-                childNuVertexSeparation_shower.append(eventDict['childNuVertexSeparation'][iLink])
             separation3D_track.append(eventDict['separation3D'][iLink]) if isTrack else \
                 separation3D_shower.append(eventDict['separation3D'][iLink])
             pidLinkType_track.append(eventDict['pidLinkType'][iLink]) if isTrack else \
                 pidLinkType_shower.append(eventDict['pidLinkType'][iLink])
-            trackShowerLinkType_track.append(eventDict['trackShowerLinkType'][iLink]) if isTrack else \
-                trackShowerLinkType_shower.append(eventDict['trackShowerLinkType'][iLink]) 
             trueParentChildLink_track.append(eventDict['trueParentChildLink'][iLink]) if isTrack else \
                 trueParentChildLink_shower.append(eventDict['trueParentChildLink'][iLink])
             
@@ -1310,6 +1459,18 @@ def readEvent(eventDict) :
         parentConnectionPointOpeningAngle_track[linksMadeCounter].append(eventDict['parentConnectionPointOpeningAngle'][iLink]) if isTrack else \
             parentConnectionPointOpeningAngle_shower[linksMadeCounter].append(eventDict['parentConnectionPointOpeningAngle'][iLink])
         
+        # Calculate orientation wrt the neutrino vertex
+        parentIsPOIClosestToNu_track[linksMadeCounter].append(1 if eventDict['isParentPOIClosestToNu'][iLink] else 0) if isTrack else \
+            parentIsPOIClosestToNu_shower[linksMadeCounter].append(1 if eventDict['isParentPOIClosestToNu'][iLink] else 0)
+        childIsPOIClosestToNu_track[linksMadeCounter].append(1 if eventDict['isChildPOIClosestToNu'][iLink] else 0) if isTrack else \
+            childIsPOIClosestToNu_shower[linksMadeCounter].append(1 if eventDict['isChildPOIClosestToNu'][iLink] else 0)
+        
+        # Calculate training cuts 
+        if (eventDict['isLinkOrientationCorrect'][iLink]) :            
+            trainingCutSep_track.append(separation3D_notNorm[iLink]) if isTrack else trainingCutSep_shower.append(separation3D_notNorm[iLink])
+            trainingCutL_track.append(eventDict['trainingCutL'][iLink]) if isTrack else trainingCutL_shower.append(eventDict['trainingCutL'][iLink])
+            trainingCutT_track.append(eventDict['trainingCutT'][iLink]) if isTrack else trainingCutT_shower.append(eventDict['trainingCutT'][iLink])
+        
         linksMadeCounter = linksMadeCounter + 1
         
         if (isTrack and (linksMadeCounter == 4)) :
@@ -1330,8 +1491,6 @@ def readEvent(eventDict) :
     childPFPIndex_track = np.array(childPFPIndex_track)
     # Node variables
     parentTrackScore_track = np.array(parentTrackScore_track)
-    parentNuVertexSeparation_track = np.array(parentNuVertexSeparation_track)
-    childNuVertexSeparation_track = np.array(childNuVertexSeparation_track)
     parentEndRegionNHits_track = np.array(parentEndRegionNHits_track)
     parentEndRegionNParticles_track = np.array(parentEndRegionNParticles_track)
     parentEndRegionRToWall_track = np.array(parentEndRegionRToWall_track)
@@ -1350,8 +1509,13 @@ def readEvent(eventDict) :
     parentConnectionPointNHitRatio_track = np.array(parentConnectionPointNHitRatio_track)
     parentConnectionPointEigenValueRatio_track = np.array(parentConnectionPointEigenValueRatio_track)
     parentConnectionPointOpeningAngle_track = np.array(parentConnectionPointOpeningAngle_track)
+    parentIsPOIClosestToNu_track = np.array(parentIsPOIClosestToNu_track)
+    childIsPOIClosestToNu_track = np.array(childIsPOIClosestToNu_track)
     pidLinkType_track = np.array(pidLinkType_track)
-    trackShowerLinkType_track = np.array(trackShowerLinkType_track)
+    # Training cut variables
+    trainingCutSep_track = np.array(trainingCutSep_track)
+    trainingCutL_track = np.array(trainingCutL_track)
+    trainingCutT_track = np.array(trainingCutT_track)
     # Truth 
     trueParentChildLink_track = np.array(trueParentChildLink_track)
     y_track = np.array(y_track)
@@ -1360,8 +1524,6 @@ def readEvent(eventDict) :
     childPFPIndex_shower = np.array(childPFPIndex_shower)
     # Node variables
     parentTrackScore_shower = np.array(parentTrackScore_shower)
-    parentNuVertexSeparation_shower = np.array(parentNuVertexSeparation_shower)
-    childNuVertexSeparation_shower = np.array(childNuVertexSeparation_shower)
     parentEndRegionNHits_shower = np.array(parentEndRegionNHits_shower)
     parentEndRegionNParticles_shower = np.array(parentEndRegionNParticles_shower)
     parentEndRegionRToWall_shower = np.array(parentEndRegionRToWall_shower)
@@ -1380,8 +1542,13 @@ def readEvent(eventDict) :
     parentConnectionPointNHitRatio_shower = np.array(parentConnectionPointNHitRatio_shower)
     parentConnectionPointEigenValueRatio_shower = np.array(parentConnectionPointEigenValueRatio_shower)
     parentConnectionPointOpeningAngle_shower = np.array(parentConnectionPointOpeningAngle_shower)
+    parentIsPOIClosestToNu_shower = np.array(parentIsPOIClosestToNu_shower)
+    childIsPOIClosestToNu_shower = np.array(childIsPOIClosestToNu_shower)
     pidLinkType_shower = np.array(pidLinkType_shower)
-    trackShowerLinkType_shower = np.array(trackShowerLinkType_shower)
+    # Training cut variables
+    trainingCutSep_shower = np.array(trainingCutSep_shower)
+    trainingCutL_shower = np.array(trainingCutL_shower)
+    trainingCutT_shower = np.array(trainingCutT_shower)
     # Truth 
     trueParentChildLink_shower = np.array(trueParentChildLink_shower)
     y_shower = np.array(y_shower)
@@ -1411,7 +1578,9 @@ def readEvent(eventDict) :
                                                  parentConnectionPointNDownstreamHits_track[0, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointNHitRatio_track[0, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointEigenValueRatio_track[0, :].reshape(nLinks_track, 1), \
-                                                 parentConnectionPointOpeningAngle_track[0, :].reshape(nLinks_track, 1)), axis=1), \
+                                                 parentConnectionPointOpeningAngle_track[0, :].reshape(nLinks_track, 1), \
+                                                 parentIsPOIClosestToNu_track[0, :].reshape(nLinks_track, 1), \
+                                                 childIsPOIClosestToNu_track[0, :].reshape(nLinks_track, 1)), axis=1), \
                                  np.concatenate((parentEndRegionNHits_track[1, :].reshape(nLinks_track, 1), \
                                                  parentEndRegionNParticles_track[1, :].reshape(nLinks_track, 1), \
                                                  parentEndRegionRToWall_track[1, :].reshape(nLinks_track, 1), \
@@ -1428,7 +1597,9 @@ def readEvent(eventDict) :
                                                  parentConnectionPointNDownstreamHits_track[1, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointNHitRatio_track[1, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointEigenValueRatio_track[1, :].reshape(nLinks_track, 1), \
-                                                 parentConnectionPointOpeningAngle_track[1, :].reshape(nLinks_track, 1)), axis=1), \
+                                                 parentConnectionPointOpeningAngle_track[1, :].reshape(nLinks_track, 1), \
+                                                 parentIsPOIClosestToNu_track[1, :].reshape(nLinks_track, 1), \
+                                                 childIsPOIClosestToNu_track[1, :].reshape(nLinks_track, 1)), axis=1), \
                                  np.concatenate((parentEndRegionNHits_track[2, :].reshape(nLinks_track, 1), \
                                                  parentEndRegionNParticles_track[2, :].reshape(nLinks_track, 1), \
                                                  parentEndRegionRToWall_track[2, :].reshape(nLinks_track, 1), \
@@ -1445,7 +1616,9 @@ def readEvent(eventDict) :
                                                  parentConnectionPointNDownstreamHits_track[2, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointNHitRatio_track[2, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointEigenValueRatio_track[2, :].reshape(nLinks_track, 1), \
-                                                 parentConnectionPointOpeningAngle_track[2, :].reshape(nLinks_track, 1)), axis=1), \
+                                                 parentConnectionPointOpeningAngle_track[2, :].reshape(nLinks_track, 1), \
+                                                 parentIsPOIClosestToNu_track[2, :].reshape(nLinks_track, 1), \
+                                                 childIsPOIClosestToNu_track[2, :].reshape(nLinks_track, 1)), axis=1), \
                                  np.concatenate((parentEndRegionNHits_track[3, :].reshape(nLinks_track, 1), \
                                                  parentEndRegionNParticles_track[3, :].reshape(nLinks_track, 1), \
                                                  parentEndRegionRToWall_track[3, :].reshape(nLinks_track, 1), \
@@ -1462,7 +1635,9 @@ def readEvent(eventDict) :
                                                  parentConnectionPointNDownstreamHits_track[3, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointNHitRatio_track[3, :].reshape(nLinks_track, 1), \
                                                  parentConnectionPointEigenValueRatio_track[3, :].reshape(nLinks_track, 1), \
-                                                 parentConnectionPointOpeningAngle_track[3, :].reshape(nLinks_track, 1)), axis=1)), axis=1)
+                                                 parentConnectionPointOpeningAngle_track[3, :].reshape(nLinks_track, 1), \
+                                                 parentIsPOIClosestToNu_track[3, :].reshape(nLinks_track, 1), \
+                                                 childIsPOIClosestToNu_track[3, :].reshape(nLinks_track, 1)), axis=1)), axis=1)
 
     coc0_shower = np.concatenate((np.concatenate((parentEndRegionNHits_shower[0, :].reshape(nLinks_shower, 1), \
                                                  parentEndRegionNParticles_shower[0, :].reshape(nLinks_shower, 1), \
@@ -1480,7 +1655,9 @@ def readEvent(eventDict) :
                                                  parentConnectionPointNDownstreamHits_shower[0, :].reshape(nLinks_shower, 1), \
                                                  parentConnectionPointNHitRatio_shower[0, :].reshape(nLinks_shower, 1), \
                                                  parentConnectionPointEigenValueRatio_shower[0, :].reshape(nLinks_shower, 1), \
-                                                 parentConnectionPointOpeningAngle_shower[0, :].reshape(nLinks_shower, 1)), axis=1), \
+                                                 parentConnectionPointOpeningAngle_shower[0, :].reshape(nLinks_shower, 1), \
+                                                 parentIsPOIClosestToNu_shower[0, :].reshape(nLinks_shower, 1), \
+                                                 childIsPOIClosestToNu_shower[0, :].reshape(nLinks_shower, 1)), axis=1), \
                                  np.concatenate((parentEndRegionNHits_shower[1, :].reshape(nLinks_shower, 1), \
                                                  parentEndRegionNParticles_shower[1, :].reshape(nLinks_shower, 1), \
                                                  parentEndRegionRToWall_shower[1, :].reshape(nLinks_shower, 1), \
@@ -1497,35 +1674,76 @@ def readEvent(eventDict) :
                                                  parentConnectionPointNDownstreamHits_shower[1, :].reshape(nLinks_shower, 1), \
                                                  parentConnectionPointNHitRatio_shower[1, :].reshape(nLinks_shower, 1), \
                                                  parentConnectionPointEigenValueRatio_shower[1, :].reshape(nLinks_shower, 1), \
-                                                 parentConnectionPointOpeningAngle_shower[1, :].reshape(nLinks_shower, 1)), axis=1)), axis=1)
+                                                 parentConnectionPointOpeningAngle_shower[1, :].reshape(nLinks_shower, 1), \
+                                                 parentIsPOIClosestToNu_shower[1, :].reshape(nLinks_shower, 1), \
+                                                 childIsPOIClosestToNu_shower[1, :].reshape(nLinks_shower, 1)), axis=1)), axis=1)
     
     # concatenate variable_single and orientations
     variables_track = np.concatenate((parentTrackScore_track.reshape(nLinks_track, 1), \
-                                      parentNuVertexSeparation_track.reshape(nLinks_track, 1), \
-                                      childNuVertexSeparation_track.reshape(nLinks_track, 1), \
                                       separation3D_track.reshape(nLinks_track, 1), \
                                       pidLinkType_track.reshape(nLinks_track, 1), \
-                                      trackShowerLinkType_track.reshape(nLinks_track, 1), \
                                       coc0_track), axis=1)
 
     variables_shower = np.concatenate((parentTrackScore_shower.reshape(nLinks_shower, 1), \
-                                      parentNuVertexSeparation_shower.reshape(nLinks_shower, 1), \
-                                      childNuVertexSeparation_shower.reshape(nLinks_shower, 1), \
                                       separation3D_shower.reshape(nLinks_shower, 1), \
                                       pidLinkType_shower.reshape(nLinks_shower, 1), \
-                                      trackShowerLinkType_shower.reshape(nLinks_shower, 1), \
                                       coc0_shower), axis=1)
-
     
-    return parentPFPIndex_track, childPFPIndex_track, variables_track, y_track, trueParentChildLink_track, parentPFPIndex_shower, childPFPIndex_shower, variables_shower, y_shower, trueParentChildLink_shower
+    return parentPFPIndex_track, childPFPIndex_track, variables_track, y_track, trueParentChildLink_track, trainingCutSep_track, trainingCutL_track, trainingCutT_track, \
+parentPFPIndex_shower, childPFPIndex_shower, variables_shower, y_shower, trueParentChildLink_shower, trainingCutSep_shower, trainingCutL_shower, trainingCutT_shower
 
 ############################################################################################################################################
 ############################################################################################################################################
         
+def CalculateTrainingCuts(childStartX, childStartY, childStartZ, childStartDX, childStartDY, childStartDZ, parentEndX, parentEndY, parentEndZ, parentEndDX, parentEndDY, parentEndDZ) :
+    childStartPos = np.array([childStartX, childStartY, childStartZ])
+    childStartDir = np.array([childStartDX, childStartDY, childStartDZ]) * -1.0 # Need to turn it around
+    parentEndPos = np.array([parentEndX, parentEndY, parentEndZ])
+    parentEndDir = np.array([parentEndDX, parentEndDY, parentEndDZ])
+    
+    smallestT = 999999999999999
+    connectionPoint = np.array([-999.0, -999.0, -999.0])
+    found = False
+    
+    extrapolatedPoint = childStartPos
+    
+    while (IsInFV(extrapolatedPoint)) :
         
+        extrapolatedPoint = extrapolatedPoint + (childStartDir * 1.0)
+        parentDir_t = np.linalg.norm(np.cross(parentEndDir, (extrapolatedPoint - parentEndPos)))
         
+        if (parentDir_t < smallestT) : 
+            smallestT = parentDir_t
+            connectionPoint = extrapolatedPoint
+            found = True
+            
+    childDir_t = np.linalg.norm(childStartPos - connectionPoint) if found else -999.0
+    parentDir_l = np.dot(parentEndDir, (connectionPoint - parentEndPos)) if found else -999.0
+
+    return parentDir_l, childDir_t        
         
+############################################################################################################################################
+############################################################################################################################################
         
+def IsInFV(position_np) :
+    
+    minX = -360.0
+    maxX = 360.0
+    minY = -600.0 
+    maxY = 600.0
+    minZ = 0.0
+    maxZ = 1394.0
+
+    if ((position_np[0] < minX) or (position_np[0] > maxX)) :
+        return False;
+
+    if ((position_np[1] < minY) or (position_np[1] > maxY)) :
+        return False;
+
+    if ((position_np[2] < minZ) or (position_np[2] > maxZ)) :
+        return False
+    
+    return True
         
 
     

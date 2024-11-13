@@ -1,6 +1,9 @@
 import torch
 from torch_geometric.nn import SAGEConv
 
+from tensorflow.keras import Input, Model
+from tensorflow.keras.layers import Dense, Dropout, Concatenate
+
 # To calculate node embeddings
 class GNN(torch.nn.Module):
     
@@ -50,3 +53,50 @@ class NodeClassifier(torch.nn.Module):
 #        pred = self.classifier(x, edge_index)
 #        return pred
         
+def PrimaryTierGroupModel_tracks(nVariables, dropoutRate=0.5):
+    
+    networkInputs_0 = Input(shape=(nVariables, ))
+    networkInputs_1 = Input(shape=(nVariables, ))
+    
+    orientationBranch_0 = OrientationBranch(networkInputs_0, dropoutRate)
+    orientationBranch_1 = OrientationBranch(networkInputs_1, dropoutRate)
+    
+    prediction_0 = Dense(3, activation='softmax', name="orientation_0")(orientationBranch_0)
+    prediction_1 = Dense(3, activation='softmax', name="orientation_1")(orientationBranch_1)
+    
+    combinedBranches = AllBranches_tracks(prediction_0, prediction_1, dropoutRate)
+    prediction = Dense(1, activation='sigmoid', name="final_prediction")(combinedBranches)
+    
+    model = Model(inputs=[networkInputs_0, networkInputs_1], outputs=[prediction_0, prediction_1, prediction])
+    
+    return model
+
+
+##########################################################################################################################
+##########################################################################################################################
+
+def OrientationBranch(branchInputs, dropoutRate):
+    ################################
+    # Start branch
+    ################################
+    x = Dense(128, activation="relu", kernel_initializer='lecun_uniform')(branchInputs)
+    x = Dropout(dropoutRate)(x)
+    x = Dense(128, activation="relu", kernel_initializer='lecun_uniform')(x)
+    x = Dropout(dropoutRate)(x)
+    x = Dense(64, activation="relu", kernel_initializer='lecun_uniform')(x)
+    x = Dropout(dropoutRate)(x)
+    x = Dense(32, activation="relu", kernel_initializer='lecun_uniform')(x)
+    
+    return x
+
+##########################################################################################################################
+##########################################################################################################################
+
+def AllBranches_tracks(orientationBranch_0, orientationBranch_1, dropoutRate):
+
+    x = Concatenate()([orientationBranch_0, orientationBranch_1])
+    x = Dense(64, activation="relu", kernel_initializer='lecun_uniform')(x)
+    x = Dropout(dropoutRate)(x)
+    x = Dense(32, activation="relu", kernel_initializer='lecun_uniform')(x)
+    
+    return x

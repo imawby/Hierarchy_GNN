@@ -2,6 +2,8 @@ import numpy as np
 import uproot
 import math
 
+import copy
+
 from tensorflow.keras.utils import to_categorical
 
 from sklearn.utils import shuffle
@@ -187,12 +189,15 @@ def readTreeGroupLinks_track(fileNames) :
     # Link variables
     primaryTrackScore = []
     primaryNSpacepoints = []
-    
     primaryNuVertexSeparation = [[], []]
     primaryStartRegionNHits = [[], []]
     primaryStartRegionNParticles = [[], []]
     primaryDCA = [[], []]
     primaryConnectionExtrapDistance = [[], []]
+    primaryIsPOIClosestToNu = [[], []]
+    
+    # Training cut 
+    trainingCutDCA = [] # only fill for correct orientation
     
     # Truth
     isTruePrimaryLink = []
@@ -241,6 +246,7 @@ def readTreeGroupLinks_track(fileNames) :
             primaryStartRegionNParticles_file = np.array(branches['PrimaryStartRegionNParticles'][iEvent][primaryTrack_mask])            
             primaryDCA_file = np.array(branches['PrimaryDCA'][iEvent][primaryTrack_mask])            
             primaryConnectionExtrapDistance_file = np.array(branches['PrimaryConnectionExtrapDistance'][iEvent][primaryTrack_mask])
+            primaryIsPOIClosestToNu_file = np.array(branches['PrimaryIsPOIClosestToNu'][iEvent][primaryTrack_mask])
             # True
             isTruePrimaryLink_file = np.array(branches['TruePrimaryLink'][iEvent][primaryTrack_mask])
             isLinkOrientationCorrect_file = np.array(branches['IsPrimaryLinkOrientationCorrect'][iEvent][primaryTrack_mask])
@@ -259,6 +265,10 @@ def readTreeGroupLinks_track(fileNames) :
                 
                 # If we have moved onto a new group...
                 if (currentPFP != primaryPFPIndex_file[iLink]) :
+                    
+                    if len(np.where(primaryPFPIndex_file == primaryPFPIndex_file[iLink])[0]) != 2 :
+                        continue
+
                     # set the common vars
                     primaryNSpacepoints.append(primaryNSpacepoints_file[iLink])   
                     isTruePrimaryLink.append(isTruePrimaryLink_file[iLink])
@@ -278,6 +288,11 @@ def readTreeGroupLinks_track(fileNames) :
                 primaryStartRegionNParticles[order[linksMadeCounter]].append(primaryStartRegionNParticles_file[iLink])
                 primaryDCA[order[linksMadeCounter]].append(primaryDCA_file[iLink])
                 primaryConnectionExtrapDistance[order[linksMadeCounter]].append(primaryConnectionExtrapDistance_file[iLink])
+                primaryIsPOIClosestToNu[order[linksMadeCounter]].append(1 if primaryIsPOIClosestToNu_file[iLink] else 0)
+                
+                # Add in training cuts 
+                if (isLinkOrientationCorrect_file[iLink]) :
+                    trainingCutDCA.append(primaryDCA_file[iLink])
 
                 linksMadeCounter = linksMadeCounter + 1
 
@@ -290,7 +305,7 @@ def readTreeGroupLinks_track(fileNames) :
                     this_y = [0, 0]
                     this_isLinkOrientationCorrect = [0, 0]
                     order = shuffle(order)
-            
+
     ###################################
     # Now turn things into numpy arrays
     ###################################
@@ -301,6 +316,7 @@ def readTreeGroupLinks_track(fileNames) :
     primaryStartRegionNParticles = np.array(primaryStartRegionNParticles, dtype='float64')
     primaryDCA = np.array(primaryDCA, dtype='float64')
     primaryConnectionExtrapDistance = np.array(primaryConnectionExtrapDistance, dtype='float64')
+    primaryIsPOIClosestToNu = np.array(primaryIsPOIClosestToNu, dtype='int')
     # Truth
     isTruePrimaryLink = np.array(isTruePrimaryLink)
     isLinkOrientationCorrect = np.array(isLinkOrientationCorrect)
@@ -329,21 +345,21 @@ def readTreeGroupLinks_track(fileNames) :
                                            primaryStartRegionNHits[0, :].reshape(nLinks, 1), \
                                            primaryStartRegionNParticles[0, :].reshape(nLinks, 1), \
                                            primaryDCA[0, :].reshape(nLinks, 1), \
-                                           primaryConnectionExtrapDistance[0, :].reshape(nLinks, 1)), axis=1), \
+                                           primaryConnectionExtrapDistance[0, :].reshape(nLinks, 1), \
+                                           primaryIsPOIClosestToNu[0, :].reshape(nLinks, 1)), axis=1), \
                            np.concatenate((primaryNuVertexSeparation[1, :].reshape(nLinks, 1), \
                                            primaryStartRegionNHits[1, :].reshape(nLinks, 1), \
                                            primaryStartRegionNParticles[1, :].reshape(nLinks, 1), \
                                            primaryDCA[1, :].reshape(nLinks, 1), \
-                                           primaryConnectionExtrapDistance[1, :].reshape(nLinks, 1)), axis=1)), axis=1)      
-    
-    
+                                           primaryConnectionExtrapDistance[1, :].reshape(nLinks, 1), \
+                                           primaryIsPOIClosestToNu[1, :].reshape(nLinks, 1)), axis=1)), axis=1)      
     
     # concatenate variable_single and orientations
     variables = np.concatenate((primaryNSpacepoints.reshape(nLinks, 1), \
                                 coc0), axis=1)
 
     
-    return nLinks, variables, y, isTruePrimaryLink, isLinkOrientationCorrect
+    return nLinks, variables, y, isTruePrimaryLink, isLinkOrientationCorrect, trainingCutDCA
 
     
 ############################################################################################################################################
@@ -361,7 +377,9 @@ def readTreeGroupLinks_shower(fileNames) :
     primaryStartRegionNParticles = []
     primaryDCA = []
     primaryConnectionExtrapDistance = []
-    
+    primaryIsPOIClosestToNu = []
+    # Training cut 
+    trainingCutDCA = [] # only fill for correct orientation
     # Truth
     isTruePrimaryLink = []
     isLinkOrientationCorrect = []
@@ -408,12 +426,15 @@ def readTreeGroupLinks_shower(fileNames) :
             primaryStartRegionNParticles.extend(branches['PrimaryStartRegionNParticles'][iEvent][primaryShower_mask])            
             primaryDCA.extend(branches['PrimaryDCA'][iEvent][primaryShower_mask])            
             primaryConnectionExtrapDistance.extend(branches['PrimaryConnectionExtrapDistance'][iEvent][primaryShower_mask])
+            primaryIsPOIClosestToNu.extend(branches['PrimaryIsPOIClosestToNu'][iEvent][primaryShower_mask])
             # True
             isTruePrimaryLink_file = branches['TruePrimaryLink'][iEvent][primaryShower_mask]
             isTruePrimaryLink.extend(isTruePrimaryLink_file)
             isLinkOrientationCorrect_file = branches['IsPrimaryLinkOrientationCorrect'][iEvent][primaryShower_mask]
             isLinkOrientationCorrect.extend(isLinkOrientationCorrect_file)
-           
+            # Add in training cuts 
+            trainingCutDCA.extend(branches['PrimaryDCA'][iEvent][primaryShower_mask])
+        
             this_y = np.zeros(np.array(isTruePrimaryLink_file).shape)
             this_y[np.logical_and(isTruePrimaryLink_file, isLinkOrientationCorrect_file)] = 1
             this_y[np.logical_and(isTruePrimaryLink_file, np.logical_not(isLinkOrientationCorrect_file))] = 2
@@ -429,6 +450,7 @@ def readTreeGroupLinks_shower(fileNames) :
     primaryStartRegionNParticles = np.array(primaryStartRegionNParticles, dtype='float64')
     primaryDCA = np.array(primaryDCA, dtype='float64')
     primaryConnectionExtrapDistance = np.array(primaryConnectionExtrapDistance, dtype='float64')
+    primaryIsPOIClosestToNu = np.array(primaryIsPOIClosestToNu, dtype='int')
     # Truth
     isTruePrimaryLink = np.array(isTruePrimaryLink)
     isLinkOrientationCorrect = np.array(isLinkOrientationCorrect)
@@ -459,16 +481,18 @@ def readTreeGroupLinks_shower(fileNames) :
                            primaryStartRegionNHits.reshape(nLinks, 1), \
                            primaryStartRegionNParticles.reshape(nLinks, 1), \
                            primaryDCA.reshape(nLinks, 1), \
-                           primaryConnectionExtrapDistance.reshape(nLinks, 1)), axis=1)    
+                           primaryConnectionExtrapDistance.reshape(nLinks, 1), \
+                           primaryIsPOIClosestToNu.reshape(nLinks, 1)), axis=1)    
 
-    
-    return nLinks, variables, y, isTruePrimaryLink, isLinkOrientationCorrect
+    return nLinks, variables, y, isTruePrimaryLink, isLinkOrientationCorrect, trainingCutDCA
         
         
 ############################################################################################################################################
 ############################################################################################################################################        
 
 def readEvent(eventDict) :
+        
+    trainingDCA = copy.deepcopy(eventDict['primaryDCA'])
         
     ###################################
     # Need to normalise!
@@ -491,8 +515,11 @@ def readEvent(eventDict) :
     primaryStartRegionNParticles_track = [[], []]
     primaryDCA_track = [[], []]
     primaryConnectionExtrapDistance_track = [[], []]
+    primaryIsPOIClosestToNu_track = [[], []]
     # ID
     primaryPFPIndex_track = []
+    # training
+    trainingDCA_track_temp = [[], []]
     # Truth
     isTruePrimaryLink_track = []
     y_track = []
@@ -507,8 +534,11 @@ def readEvent(eventDict) :
     primaryStartRegionNParticles_shower = []
     primaryDCA_shower = []
     primaryConnectionExtrapDistance_shower = []
+    primaryIsPOIClosestToNu_shower = []
     # ID
     primaryPFPIndex_shower = []
+    # training
+    trainingDCA_shower = []
     # Truth
     isTruePrimaryLink_shower = []
 
@@ -526,6 +556,10 @@ def readEvent(eventDict) :
             
         # If we have moved onto a new group...
         if (currentPFP != eventDict['primaryPFPIndex'][iLink]) :
+            
+            if isTrack and len(np.where(eventDict['primaryPFPIndex'] == eventDict['primaryPFPIndex'][iLink])[0]) != 2 :
+                continue
+            
             # set the common vars
             primaryNSpacepoints_track.append(eventDict['primaryNSpacepoints'][iLink]) if isTrack else primaryNSpacepoints_shower.append(eventDict['primaryNSpacepoints'][iLink])
             primaryPFPIndex_track.append(eventDict['primaryPFPIndex'][iLink]) if isTrack else primaryPFPIndex_shower.append(eventDict['primaryPFPIndex'][iLink])
@@ -551,7 +585,12 @@ def readEvent(eventDict) :
             primaryDCA_shower.append(eventDict['primaryDCA'][iLink])
         primaryConnectionExtrapDistance_track[linksMadeCounter].append(eventDict['primaryConnectionExtrapDistance'][iLink]) if isTrack else \
             primaryConnectionExtrapDistance_shower.append(eventDict['primaryConnectionExtrapDistance'][iLink]) 
-
+        primaryIsPOIClosestToNu_track[linksMadeCounter].append(1 if eventDict['primaryIsPOIClosestToNu'][iLink] else 0) if isTrack else \
+            primaryIsPOIClosestToNu_shower.append(1 if eventDict['primaryIsPOIClosestToNu'][iLink] else 0)
+        
+        trainingDCA_track_temp[linksMadeCounter].append(trainingDCA[iLink]) if isTrack else \
+            trainingDCA_shower.append(trainingDCA[iLink])
+        
         linksMadeCounter = linksMadeCounter + 1
 
         if (isTrack and (linksMadeCounter == 2)) :
@@ -561,6 +600,9 @@ def readEvent(eventDict) :
             
         if (not isTrack) :
             linksMadeCounter = 0
+            
+            
+    trainingDCA_track = [min(trainingDCA_track_temp[0][i], trainingDCA_track_temp[1][i]) for i in range(len(trainingDCA_track_temp[0]))]
             
     ###################################
     # Now turn things into numpy arrays
@@ -572,9 +614,11 @@ def readEvent(eventDict) :
     primaryStartRegionNParticles_track = np.array(primaryStartRegionNParticles_track, dtype='float64')
     primaryDCA_track = np.array(primaryDCA_track, dtype='float64')
     primaryConnectionExtrapDistance_track = np.array(primaryConnectionExtrapDistance_track, dtype='float64')
+    primaryIsPOIClosestToNu_track = np.array(primaryIsPOIClosestToNu_track, dtype='int')
     primaryPFPIndex_track = np.array(primaryPFPIndex_track, dtype='int')
     isTruePrimaryLink_track = np.array(isTruePrimaryLink_track, dtype='int')
     y_track = np.array(y_track, dtype='int')
+    trainingDCA_track = np.array(trainingDCA_track, dtype='float64')
             
     primaryTrackScore_shower = np.array(primaryTrackScore_shower, dtype='float64')
     primaryNSpacepoints_shower = np.array(primaryNSpacepoints_shower, dtype='float64')
@@ -583,8 +627,10 @@ def readEvent(eventDict) :
     primaryStartRegionNParticles_shower = np.array(primaryStartRegionNParticles_shower, dtype='float64')
     primaryDCA_shower = np.array(primaryDCA_shower, dtype='float64')
     primaryConnectionExtrapDistance_shower = np.array(primaryConnectionExtrapDistance_shower, dtype='float64')
+    primaryIsPOIClosestToNu_shower = np.array(primaryIsPOIClosestToNu_shower, dtype='int')
     primaryPFPIndex_shower = np.array(primaryPFPIndex_shower, dtype='int')
     isTruePrimaryLink_shower = np.array(isTruePrimaryLink_shower, dtype='int')
+    trainingDCA_shower = np.array(trainingDCA_shower, dtype='float64')
 
     ###################################
     # How many links do we have?
@@ -599,12 +645,14 @@ def readEvent(eventDict) :
                                            primaryStartRegionNHits_track[0, :].reshape(nLinks_track, 1), \
                                            primaryStartRegionNParticles_track[0, :].reshape(nLinks_track, 1), \
                                            primaryDCA_track[0, :].reshape(nLinks_track, 1), \
-                                           primaryConnectionExtrapDistance_track[0, :].reshape(nLinks_track, 1)), axis=1), \
+                                           primaryConnectionExtrapDistance_track[0, :].reshape(nLinks_track, 1), \
+                                           primaryIsPOIClosestToNu_track[0, :].reshape(nLinks_track, 1)), axis=1), \
                            np.concatenate((primaryNuVertexSeparation_track[1, :].reshape(nLinks_track, 1), \
                                            primaryStartRegionNHits_track[1, :].reshape(nLinks_track, 1), \
                                            primaryStartRegionNParticles_track[1, :].reshape(nLinks_track, 1), \
                                            primaryDCA_track[1, :].reshape(nLinks_track, 1), \
-                                           primaryConnectionExtrapDistance_track[1, :].reshape(nLinks_track, 1)), axis=1)), axis=1)   
+                                           primaryConnectionExtrapDistance_track[1, :].reshape(nLinks_track, 1), \
+                                           primaryIsPOIClosestToNu_track[1, :].reshape(nLinks_track, 1)), axis=1)), axis=1)   
     
     # concatenate variable_single and orientations
     variables_track = np.concatenate((primaryNSpacepoints_track.reshape(nLinks_track, 1), \
@@ -615,9 +663,10 @@ def readEvent(eventDict) :
                                        primaryStartRegionNHits_shower.reshape(nLinks_shower, 1), \
                                        primaryStartRegionNParticles_shower.reshape(nLinks_shower, 1), \
                                        primaryDCA_shower.reshape(nLinks_shower, 1), \
-                                       primaryConnectionExtrapDistance_shower.reshape(nLinks_shower, 1)), axis=1)
+                                       primaryConnectionExtrapDistance_shower.reshape(nLinks_shower, 1), \
+                                       primaryIsPOIClosestToNu_shower.reshape(nLinks_shower, 1)), axis=1)
     
-    return primaryPFPIndex_track, variables_track, y_track, isTruePrimaryLink_track, primaryPFPIndex_shower, variables_shower, isTruePrimaryLink_shower
+    return primaryPFPIndex_track, variables_track, y_track, isTruePrimaryLink_track, trainingDCA_track, primaryPFPIndex_shower, variables_shower, isTruePrimaryLink_shower, trainingDCA_shower
 
     
 ############################################################################################################################################
