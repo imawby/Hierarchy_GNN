@@ -2,92 +2,7 @@ import numpy as np
 import uproot
 import math
 from sklearn.utils import shuffle
-
-
-###################################
-###################################
-
-primaryNSpacepoints_min = 0.0
-primaryNSpacepoints_max = 2000.0
-primaryNuVertexSeparation_min = -50.0
-primaryNuVertexSeparation_max = 500.0
-primaryStartRegionNHits_min = -10.0
-primaryStartRegionNHits_max = 100.0
-primaryStartRegionNParticles_min = -1.0
-primaryStartRegionNParticles_max = 8.0
-primaryDCA_min = -60.0
-primaryDCA_max = 600.0
-primaryConnectionExtrapDistance_min = -700.0
-primaryConnectionExtrapDistance_max = 500.0
-primaryClosestParentL_min = -150.0
-primaryClosestParentL_max = 150.0
-primaryClosestParentT_min = -30.0
-primaryClosestParentT_max = 300.0
-primaryOpeningAngle_min = -0.5
-primaryOpeningAngle_max = 3.14
-
-############################################################################################################################################
-############################################################################################################################################
-
-def normaliseXAxis(variable, minLimit, maxLimit) :
-
-    interval = math.fabs(minLimit) + math.fabs(maxLimit)
-    variable[variable < minLimit] = minLimit
-    variable[variable > maxLimit] = maxLimit
-    variable /= interval
-    
-############################################################################################################################################
-############################################################################################################################################    
-    
-def unit_vector(vector):
-    """ Returns the unit vector of the vector.  """
-    return vector / np.linalg.norm(vector)
-
-############################################################################################################################################
-############################################################################################################################################
-
-def angle_between(v1, v2):
-    """ Returns the angle in radians between vectors 'v1' and 'v2'::
-
-            >>> angle_between((1, 0, 0), (0, 1, 0))
-            1.5707963267948966
-            >>> angle_between((1, 0, 0), (1, 0, 0))
-            0.0
-            >>> angle_between((1, 0, 0), (-1, 0, 0))
-            3.141592653589793
-    """
-    v1_u = unit_vector(v1)
-    v2_u = unit_vector(v2)
-    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))    
-
-############################################################################################################################################
-############################################################################################################################################   
-
-# def makeUnique(maxEventID, shift, tree_eventID) :
-#     for eventID in range(maxEventID + 1) :
-#         instances = np.where(tree_eventID == eventID)[0]
-
-#         if (len(instances) != 0) :
-#             groupIndex = -1
-#             startIndex = []
-#             endIndex = []
-#             last = -999
-
-#             for instance in instances :
-
-#                 if (instance != (last + 1)) :
-#                     groupIndex = groupIndex + 1
-#                     startIndex.append(instance)
-#                     endIndex.append(-999)
-
-#                 endIndex[groupIndex] = instance
-#                 last = instance
-
-#             nGroups = groupIndex + 1
-
-#             for groupIndex in range(0, nGroups) :
-#                 for particleIndex in range(startIndex[groupIndex], endIndex[groupIndex] + 1) :
-#                     tree_eventID[particleIndex] = tree_eventID[particleIndex] + (groupIndex * shift)
+import Normalise 
                     
 ############################################################################################################################################                      
 
@@ -223,14 +138,14 @@ def readTreeGroupLinks_track(fileName, normalise) :
     # Normalise variables
     ###################################
     if (normalise) :
-        normaliseXAxis(primaryNSpacepoints, primaryNSpacepoints_min, primaryNSpacepoints_max)    
-        normaliseXAxis(primaryNuVertexSeparation, primaryNuVertexSeparation_min, primaryNuVertexSeparation_max)    
-        normaliseXAxis(primaryStartRegionNHits, primaryStartRegionNHits_min, primaryStartRegionNHits_max)    
-        normaliseXAxis(primaryStartRegionNParticles, primaryStartRegionNParticles_min, primaryStartRegionNParticles_max)    
-        normaliseXAxis(primaryDCA, primaryDCA_min, primaryDCA_max)
-        normaliseXAxis(primaryConnectionExtrapDistance, primaryConnectionExtrapDistance_min, primaryConnectionExtrapDistance_max)
-        normaliseXAxis(primaryClosestParentL, primaryClosestParentL_min, primaryClosestParentL_max) 
-        normaliseXAxis(primaryClosestParentT, primaryClosestParentT_min, primaryClosestParentT_max) 
+        Normalise.normaliseXAxis(primaryNSpacepoints, Normalise.primaryNSpacepoints_min, Normalise.primaryNSpacepoints_max)    
+        Normalise.normaliseXAxis(primaryNuVertexSeparation, Normalise.primaryNuVertexSeparation_min, Normalise.primaryNuVertexSeparation_max)    
+        Normalise.normaliseXAxis(primaryStartRegionNHits, Normalise.primaryStartRegionNHits_min, Normalise.primaryStartRegionNHits_max)    
+        Normalise.normaliseXAxis(primaryStartRegionNParticles, Normalise.primaryStartRegionNParticles_min, Normalise.primaryStartRegionNParticles_max)    
+        Normalise.normaliseXAxis(primaryDCA, Normalise.primaryDCA_min, Normalise.primaryDCA_max)
+        Normalise.normaliseXAxis(primaryConnectionExtrapDistance, Normalise.primaryConnectionExtrapDistance_min, Normalise.primaryConnectionExtrapDistance_max)
+        Normalise.normaliseXAxis(primaryClosestParentL, Normalise.primaryClosestParentL_min, Normalise.primaryClosestParentL_max) 
+        Normalise.normaliseXAxis(primaryClosestParentT, Normalise.primaryClosestParentT_min, Normalise.primaryClosestParentT_max) 
         
     ###################################
     # Concatenate
@@ -348,14 +263,14 @@ def readTreeGroupLinks_shower(fileName, normalise) :
     # Normalise variables
     ###################################
     if (normalise) :
-        normaliseXAxis(primaryNSpacepoints, primaryNSpacepoints_min, primaryNSpacepoints_max)    
-        normaliseXAxis(primaryNuVertexSeparation, primaryNuVertexSeparation_min, primaryNuVertexSeparation_max)    
-        normaliseXAxis(primaryStartRegionNHits, primaryStartRegionNHits_min, primaryStartRegionNHits_max)    
-        normaliseXAxis(primaryStartRegionNParticles, primaryStartRegionNParticles_min, primaryStartRegionNParticles_max)    
-        normaliseXAxis(primaryDCA, primaryDCA_min, primaryDCA_max)
-        normaliseXAxis(primaryConnectionExtrapDistance, primaryConnectionExtrapDistance_min, primaryConnectionExtrapDistance_max) 
-        normaliseXAxis(primaryClosestParentL, primaryClosestParentL_min, primaryClosestParentL_max) 
-        normaliseXAxis(primaryClosestParentT, primaryClosestParentT_min, primaryClosestParentT_max) 
+        Normalise.normaliseXAxis(primaryNSpacepoints, Normalise.primaryNSpacepoints_min, Normalise.primaryNSpacepoints_max)    
+        Normalise.normaliseXAxis(primaryNuVertexSeparation, Normalise.primaryNuVertexSeparation_min, Normalise.primaryNuVertexSeparation_max)    
+        Normalise.normaliseXAxis(primaryStartRegionNHits, Normalise.primaryStartRegionNHits_min, Normalise.primaryStartRegionNHits_max)    
+        Normalise.normaliseXAxis(primaryStartRegionNParticles, Normalise.primaryStartRegionNParticles_min, Normalise.primaryStartRegionNParticles_max)    
+        Normalise.normaliseXAxis(primaryDCA, Normalise.primaryDCA_min, Normalise.primaryDCA_max)
+        Normalise.normaliseXAxis(primaryConnectionExtrapDistance, Normalise.primaryConnectionExtrapDistance_min, Normalise.primaryConnectionExtrapDistance_max) 
+        Normalise.normaliseXAxis(primaryClosestParentL, Normalise.primaryClosestParentL_min, Normalise.primaryClosestParentL_max) 
+        Normalise.normaliseXAxis(primaryClosestParentT, Normalise.primaryClosestParentT_min, Normalise.primaryClosestParentT_max) 
         
     ###################################
     # Concatenate
