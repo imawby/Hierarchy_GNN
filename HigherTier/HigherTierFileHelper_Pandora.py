@@ -80,7 +80,7 @@ def getLinkIndex(parentPFPIndices, childPFPIndices, parentPFPIndex, childPFPInde
 ############################################################################################################################################
 ############################################################################################################################################        
 
-def readTreeGroupLinks_track(fileNames) :
+def readTreeGroupLinks_track(fileNames, normalise) :
         
     ###################################
     # To pull out of tree
@@ -90,13 +90,13 @@ def readTreeGroupLinks_track(fileNames) :
     childTrackScore = []
     parentNSpacepoints = []
     childNSpacepoints = []
+    separation3D = []
     parentNuVertexSep = [[], [], [], []]
     childNuVertexSep = [[], [], [], []]    
     parentEndRegionNHits = [[], [], [], []]
     parentEndRegionNParticles = [[], [], [], []]
     parentEndRegionRToWall = [[], [], [], []]
     vertexSeparation = [[], [], [], []]
-    separation3D = []
     doesChildConnect = [[], [], [], []]
     overshootStartDCA = [[], [], [], []]
     overshootStartL = [[], [], [], []]
@@ -112,7 +112,6 @@ def readTreeGroupLinks_track(fileNames) :
     parentConnectionPointOpeningAngle = [[], [], [], []]
     parentIsPOIClosestToNu = [[], [], [], []]
     childIsPOIClosestToNu = [[], [], [], []]
-    pidLinkType = []
     # Training cut variables
     trainingCutSep = []
     trainingCutL = []
@@ -121,286 +120,173 @@ def readTreeGroupLinks_track(fileNames) :
     # Truth
     trueParentChildLink = []
     isLinkOrientationCorrect = []
-    trueParentVisibleGeneration = []
     trueChildVisibleGeneration = []
     y = []
     
     for fileName in fileNames :
         print('Reading tree: ', str(fileName),', This may take a while...')
     
+        ####################################
+        # Set tree
+        ####################################  
         treeFile = uproot.open(fileName)
-        tree = treeFile['ccnuselection/ccnusel']
+        tree = treeFile['LaterTierTrackTrackTree']
         branches = tree.arrays()
-        
-        nEvents = len(branches)
-        
-        for iEvent in range(nEvents) :
-                        
-            if ((iEvent % 10) == 0) :
-                print('iEvent:', str(iEvent) + '/' + str(nEvents))
-            
-            # Failed to find a nu vertex?
-            if (branches['RecoNuVtxZ'][iEvent] < -900) :
-                continue
-                
-            # Nu vertex vars - to work out separation
-            dX = branches['RecoNuVtxX'][iEvent] - branches['NuX'][iEvent]
-            dY = branches['RecoNuVtxY'][iEvent] - branches['NuY'][iEvent]
-            dZ = branches['RecoNuVtxZ'][iEvent] - branches['NuZ'][iEvent]
-            sep = math.sqrt((dX * dX) + (dY * dY) + (dZ * dZ)) 
-            
-            if (sep > 5.0) :
-                continue
-                
-            # To establish orientation of particles wrt the neutrino vertex
-            recoNuVertex = np.array([branches['RecoNuVtxX'][iEvent], branches['RecoNuVtxY'][iEvent], branches['RecoNuVtxZ'][iEvent]])
-                
-            # We don't want this to be masked, otherwise the indices will be wrong! 
-            trueVisibleGeneration_file = np.array(branches['RecoPFPTrueVisibleGeneration'][iEvent])
-                
-            ##################################################################
-            # DEFINE THEM ALL HERE - apply track-track mask
-            ##################################################################
-            trackShowerLinkType_file = np.array(branches['TrackShowerLinkType'][iEvent])
-            trackShowerLinkType_mask = (trackShowerLinkType_file == 0)
 
-            if (np.count_nonzero(trackShowerLinkType_mask) == 0) :
-                continue      
-            ##################################################################    
-            parentIndex_file = np.array(branches['ParentPFPIndex'][iEvent][trackShowerLinkType_mask])
-            childIndex_file = np.array(branches['ChildPFPIndex'][iEvent][trackShowerLinkType_mask])
-            parentTrackScore_file = np.array(branches['ParentTrackScore'][iEvent][trackShowerLinkType_mask])            
-            childTrackScore_file = np.array(branches['RecoPFPTrackShowerScore'][iEvent]) # Do not want to mask this
-            parentNSpacepoints_file = np.array(branches['ParentNSpacepoints'][iEvent][trackShowerLinkType_mask])
-            childNSpacepoints_file = np.array(branches['ChildNSpacepoints'][iEvent][trackShowerLinkType_mask])
-            parentNuVertexSep_file = np.array(branches['ParentNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
-            childNuVertexSep_file = np.array(branches['ChildNuVertexSeparation'][iEvent][trackShowerLinkType_mask])                        
-            parentEndRegionNHits_file = np.array(branches['ParentEndRegionNHits'][iEvent][trackShowerLinkType_mask])
-            parentEndRegionNParticles_file = np.array(branches['ParentEndRegionNParticles'][iEvent][trackShowerLinkType_mask])
-            parentEndRegionRToWall_file = np.array(branches['ParentEndRegionRToWall'][iEvent][trackShowerLinkType_mask])
-            vertexSeparation_file = np.array(branches['VertexSeparation'][iEvent][trackShowerLinkType_mask])
-            separation3D_file = np.array(branches['Separation3D'][iEvent][trackShowerLinkType_mask])
-            doesChildConnect_file = np.array(branches['DoesChildConnect'][iEvent][trackShowerLinkType_mask])
-            overshootStartDCA_file = np.array(branches['OvershootStartDCA'][iEvent][trackShowerLinkType_mask])
-            overshootStartL_file = np.array(branches['OvershootStartL'][iEvent][trackShowerLinkType_mask])
-            overshootEndDCA_file = np.array(branches['OvershootEndDCA'][iEvent][trackShowerLinkType_mask])
-            overshootEndL_file = np.array(branches['OvershootEndL'][iEvent][trackShowerLinkType_mask])
-            childConnectionDCA_file = np.array(branches['ChildConnectionDCA'][iEvent][trackShowerLinkType_mask])
-            childConnectionExtrapDistance_file = np.array(branches['ChildConnectionExtrapDistance'][iEvent][trackShowerLinkType_mask])
-            childConnectionLRatio_file = np.array(branches['ChildConnectionLRatio'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointNUpstreamHits_file = np.array(branches['ParentConnectionPointNUpstreamHits'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointNDownstreamHits_file = np.array(branches['ParentConnectionPointNDownstreamHits'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointNHitRatio_file = np.array(branches['ParentConnectionPointNHitRatio'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointEigenValueRatio_file = np.array(branches['ParentConnectionPointEigenValueRatio'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointOpeningAngle_file = np.array(branches['ParentConnectionPointOpeningAngle'][iEvent][trackShowerLinkType_mask])
-            isParentPOIClosestToNu_file = np.array(branches['IsParentPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
-            isChildPOIClosestToNu_file = np.array(branches['IsChildPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
-            pidLinkType_file = np.array(branches['PIDLinkType'][iEvent][trackShowerLinkType_mask])
-            trueParentChildLink_file = np.array(branches['TrueParentChildLink'][iEvent][trackShowerLinkType_mask])
-            isLinkOrientationCorrect_file = np.array(branches['IsLinkOrientationCorrect'][iEvent][trackShowerLinkType_mask])
-            # Topology 
-            childStartX_file = np.array(branches['ChildStartX'][iEvent][trackShowerLinkType_mask])
-            childStartY_file = np.array(branches['ChildStartY'][iEvent][trackShowerLinkType_mask])
-            childStartZ_file = np.array(branches['ChildStartZ'][iEvent][trackShowerLinkType_mask])
-            childStartDX_file = np.array(branches['ChildStartDX'][iEvent][trackShowerLinkType_mask])
-            childStartDY_file = np.array(branches['ChildStartDY'][iEvent][trackShowerLinkType_mask])
-            childStartDZ_file = np.array(branches['ChildStartDZ'][iEvent][trackShowerLinkType_mask])
-            parentEndX_file = np.array(branches['ParentEndX'][iEvent][trackShowerLinkType_mask])
-            parentEndY_file = np.array(branches['ParentEndY'][iEvent][trackShowerLinkType_mask])
-            parentEndZ_file = np.array(branches['ParentEndZ'][iEvent][trackShowerLinkType_mask])
-            parentEndDX_file = np.array(branches['ParentEndDX'][iEvent][trackShowerLinkType_mask])
-            parentEndDY_file = np.array(branches['ParentEndDY'][iEvent][trackShowerLinkType_mask])
-            parentEndDZ_file = np.array(branches['ParentEndDZ'][iEvent][trackShowerLinkType_mask])
-            # Training cuts!
-            trainingCutL_file = np.array(branches['TrainingCutL'][iEvent][trackShowerLinkType_mask])
-            trainingCutT_file = np.array(branches['TrainingCutT'][iEvent][trackShowerLinkType_mask])          
-            
-            ##################################################################
-            # DEFINE THEM ALL HERE - apply generation mask
-            ##################################################################
-            # I want to discount child primaries from the training
-            trainingChild_mask = []
-            for childIndex in childIndex_file :
-                trainingChild_mask.append(branches['RecoPFPTrueVisibleGeneration'][iEvent][childIndex] != 2)
-            
-            trainingChild_mask = np.array(trainingChild_mask)
-            
-            if (np.count_nonzero(trainingChild_mask) == 0) :
-                continue
-            
-            parentIndex_file = parentIndex_file[trainingChild_mask]
-            childIndex_file = childIndex_file[trainingChild_mask]
-            parentTrackScore_file = parentTrackScore_file[trainingChild_mask]            
-            parentNSpacepoints_file = parentNSpacepoints_file[trainingChild_mask]
-            childNSpacepoints_file = childNSpacepoints_file[trainingChild_mask]
-            parentNuVertexSep_file = parentNuVertexSep_file[trainingChild_mask]
-            childNuVertexSep_file = childNuVertexSep_file[trainingChild_mask]
-            parentEndRegionNHits_file = parentEndRegionNHits_file[trainingChild_mask]
-            parentEndRegionNParticles_file = parentEndRegionNParticles_file[trainingChild_mask]
-            parentEndRegionRToWall_file = parentEndRegionRToWall_file[trainingChild_mask]
-            vertexSeparation_file = vertexSeparation_file[trainingChild_mask]
-            separation3D_file = separation3D_file[trainingChild_mask]
-            doesChildConnect_file = doesChildConnect_file[trainingChild_mask]
-            overshootStartDCA_file = overshootStartDCA_file[trainingChild_mask]
-            overshootStartL_file = overshootStartL_file[trainingChild_mask]
-            overshootEndDCA_file = overshootEndDCA_file[trainingChild_mask]
-            overshootEndL_file = overshootEndL_file[trainingChild_mask]
-            childConnectionDCA_file = childConnectionDCA_file[trainingChild_mask]
-            childConnectionExtrapDistance_file = childConnectionExtrapDistance_file[trainingChild_mask]
-            childConnectionLRatio_file = childConnectionLRatio_file[trainingChild_mask]
-            parentConnectionPointNUpstreamHits_file = parentConnectionPointNUpstreamHits_file[trainingChild_mask]
-            parentConnectionPointNDownstreamHits_file = parentConnectionPointNDownstreamHits_file[trainingChild_mask]
-            parentConnectionPointNHitRatio_file = parentConnectionPointNHitRatio_file[trainingChild_mask]
-            parentConnectionPointEigenValueRatio_file = parentConnectionPointEigenValueRatio_file[trainingChild_mask]
-            parentConnectionPointOpeningAngle_file = parentConnectionPointOpeningAngle_file[trainingChild_mask]
-            isParentPOIClosestToNu_file = isParentPOIClosestToNu_file[trainingChild_mask]
-            isChildPOIClosestToNu_file = isChildPOIClosestToNu_file[trainingChild_mask]
-            pidLinkType_file = pidLinkType_file[trainingChild_mask]
-            trueParentChildLink_file = trueParentChildLink_file[trainingChild_mask]
-            isLinkOrientationCorrect_file = isLinkOrientationCorrect_file[trainingChild_mask] 
-            # Topology
-            childStartX_file = childStartX_file[trainingChild_mask]
-            childStartY_file = childStartY_file[trainingChild_mask]
-            childStartZ_file = childStartZ_file[trainingChild_mask]
-            childStartDX_file = childStartDX_file[trainingChild_mask]
-            childStartDY_file = childStartDY_file[trainingChild_mask]
-            childStartDZ_file = childStartDZ_file[trainingChild_mask]
-            parentEndX_file = parentEndX_file[trainingChild_mask]
-            parentEndY_file = parentEndY_file[trainingChild_mask]
-            parentEndZ_file = parentEndZ_file[trainingChild_mask]
-            parentEndDX_file = parentEndDX_file[trainingChild_mask]
-            parentEndDY_file = parentEndDY_file[trainingChild_mask]
-            parentEndDZ_file = parentEndDZ_file[trainingChild_mask]
-            # Training cuts!
-            trainingCutL_file = trainingCutL_file[trainingChild_mask]
-            trainingCutT_file = trainingCutT_file[trainingChild_mask]
-            
-            ####################################
-            # Now loop over loops to group them.
-            ####################################
-            if (parentIndex_file.shape[0] != 0) :
-                currentParent = -1
-                currentChild = -1
+        ####################################
+        # Set tree branches
+        ####################################
+        # Network vars
+        parentTrackScore_file = np.array(branches['ParentTrackScore'])            
+        childTrackScore_file = np.array(branches['ChildTrackScore'])
+        parentNSpacepoints_file = np.array(branches['ParentNSpacepoints'])
+        childNSpacepoints_file = np.array(branches['ChildNSpacepoints'])
+        separation3D_file = np.array(branches['Separation3D'])
+        parentNuVertexSep_file = np.array(branches['ParentNuVertexSep'])
+        childNuVertexSep_file = np.array(branches['ChildNuVertexSep'])                        
+        parentEndRegionNHits_file = np.array(branches['ParentEndRegionNHits'])
+        parentEndRegionNParticles_file = np.array(branches['ParentEndRegionNParticles'])
+        parentEndRegionRToWall_file = np.array(branches['ParentEndRegionRToWall'])
+        vertexSeparation_file = np.array(branches['VertexSeparation'])        
+        doesChildConnect_file = np.array(branches['DoesChildConnect'])
+        overshootStartDCA_file = np.array(branches['OvershootStartDCA'])
+        overshootStartL_file = np.array(branches['OvershootStartL'])
+        overshootEndDCA_file = np.array(branches['OvershootEndDCA'])
+        overshootEndL_file = np.array(branches['OvershootEndL'])
+        childConnectionDCA_file = np.array(branches['ChildCPDCA'])
+        childConnectionExtrapDistance_file = np.array(branches['ChildCPExtrapDistance'])
+        childConnectionLRatio_file = np.array(branches['ChildCPLRatio'])
+        parentConnectionPointNUpstreamHits_file = np.array(branches['ParentCPNUpstreamHits'])
+        parentConnectionPointNDownstreamHits_file = np.array(branches['ParentCPNDownstreamHits'])
+        parentConnectionPointNHitRatio_file = np.array(branches['ParentCPNHitRatio'])
+        parentConnectionPointEigenValueRatio_file = np.array(branches['ParentCPEigenvalueRatio'])
+        parentConnectionPointOpeningAngle_file = np.array(branches['ParentCPOpeningAngle'])
+        isParentPOIClosestToNu_file = np.array(branches['ParentIsPOIClosestToNu'])
+        isChildPOIClosestToNu_file = np.array(branches['ChildIsPOIClosestToNu'])
+        # Truth
+        trueParentChildLink_file = np.array(branches['IsTrueLink'])
+        trueChildVisibleGeneration_file = np.array(branches['ChildTrueVisibleGeneration'])
+        isLinkOrientationCorrect_file = np.array(branches['IsOrientationCorrect'])
+        # Training cuts!
+        trainingCutL_file = np.array(branches['TrainingCutL'])
+        trainingCutT_file = np.array(branches['TrainingCutT'])
+
+        # nLinks
+        nLinks_file = trueParentChildLink_file.shape[0]
+        
+        ####################################
+        # Now loop over loops to group them.
+        ####################################
+        linksMadeCounter = 0
+        this_y = [0, 0, 0, 0]
+        this_isLinkOrientationCorrect = [0, 0, 0, 0]
+        order = [0, 1, 2, 3]
+
+        for iLink in range(0, nLinks_file) :
+                                                  
+            if ((iLink % 100) == 0) :
+                print('iLink:', str(iLink) + '/' + str(nLinks_file)) 
+                    
+            # Set truth                                                  
+            trueParentChildLink_bool = math.isclose(trueParentChildLink_file[iLink], 1.0, rel_tol=0.001)
+            isLinkOrientationCorrect_bool = math.isclose(isLinkOrientationCorrect_file[iLink], 1.0, rel_tol=0.001)
+                       
+            if (trueParentChildLink_bool and isLinkOrientationCorrect_bool) :
+                this_y[order[linksMadeCounter]] = 1 
+            elif (trueParentChildLink_bool and (not isLinkOrientationCorrect_bool)) :
+                this_y[order[linksMadeCounter]] = 2
+
+            this_isLinkOrientationCorrect[order[linksMadeCounter]] = isLinkOrientationCorrect_bool
+             
+            # set the link information
+            parentNuVertexSep[order[linksMadeCounter]].append(parentNuVertexSep_file[iLink])
+            childNuVertexSep[order[linksMadeCounter]].append(childNuVertexSep_file[iLink])
+            parentEndRegionNHits[order[linksMadeCounter]].append(parentEndRegionNHits_file[iLink])
+            parentEndRegionNParticles[order[linksMadeCounter]].append(parentEndRegionNParticles_file[iLink])
+            parentEndRegionRToWall[order[linksMadeCounter]].append(parentEndRegionRToWall_file[iLink])
+            vertexSeparation[order[linksMadeCounter]].append(vertexSeparation_file[iLink])
+            doesChildConnect[order[linksMadeCounter]].append(doesChildConnect_file[iLink])
+            overshootStartDCA[order[linksMadeCounter]].append(overshootStartDCA_file[iLink])
+            overshootStartL[order[linksMadeCounter]].append(overshootStartL_file[iLink])
+            overshootEndDCA[order[linksMadeCounter]].append(overshootEndDCA_file[iLink])
+            overshootEndL[order[linksMadeCounter]].append(overshootEndL_file[iLink])
+            childConnectionDCA[order[linksMadeCounter]].append(childConnectionDCA_file[iLink])
+            childConnectionExtrapDistance[order[linksMadeCounter]].append(childConnectionExtrapDistance_file[iLink])
+            childConnectionLRatio[order[linksMadeCounter]].append(childConnectionLRatio_file[iLink])
+            parentConnectionPointNUpstreamHits[order[linksMadeCounter]].append(parentConnectionPointNUpstreamHits_file[iLink])
+            parentConnectionPointNDownstreamHits[order[linksMadeCounter]].append(parentConnectionPointNDownstreamHits_file[iLink])
+            parentConnectionPointNHitRatio[order[linksMadeCounter]].append(parentConnectionPointNHitRatio_file[iLink])
+            parentConnectionPointEigenValueRatio[order[linksMadeCounter]].append(parentConnectionPointEigenValueRatio_file[iLink])
+            parentConnectionPointOpeningAngle[order[linksMadeCounter]].append(parentConnectionPointOpeningAngle_file[iLink])
+            isParentPOIClosestToNu_bool = math.isclose(isParentPOIClosestToNu_file[iLink], 1.0, rel_tol=0.001)
+            parentIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isParentPOIClosestToNu_bool else 0)
+            isChildPOIClosestToNu_bool = math.isclose(isChildPOIClosestToNu_file[iLink], 1.0, rel_tol=0.001)
+            childIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isChildPOIClosestToNu_bool else 0)
+                    
+            # Add in training cuts 
+            if (isLinkOrientationCorrect_bool) :                
+                trainingCutSep.append(separation3D_file[iLink])
+                doesChildConnect_bool = math.isclose(doesChildConnect_file[iLink], 1.0, rel_tol=0.001)
+                trainingCutDoesConnect.append(doesChildConnect_bool)
+                trainingCutL.append(trainingCutL_file[iLink])
+                trainingCutT.append(trainingCutT_file[iLink])                                          
+
+            linksMadeCounter = linksMadeCounter + 1
+                    
+            if (linksMadeCounter == 4) :
+                # set the common vars
+                parentTrackScore.append(parentTrackScore_file[iLink])
+                childTrackScore.append(childTrackScore_file[iLink])
+                parentNSpacepoints.append(parentNSpacepoints_file[iLink])
+                childNSpacepoints.append(childNSpacepoints_file[iLink])
+                separation3D.append(separation3D_file[iLink])                                                  
+                # set truth                                                                          
+                trueChildVisibleGeneration.append(trueChildVisibleGeneration_file[iLink])
+                y.append(this_y)
+                trueParentChildLink.append(trueParentChildLink_bool)
+                isLinkOrientationCorrect.append(this_isLinkOrientationCorrect)                        
+                # reset                        
                 linksMadeCounter = 0
-                
                 this_y = [0, 0, 0, 0]
                 this_isLinkOrientationCorrect = [0, 0, 0, 0]
-                order = [0, 1, 2, 3]
-
-                for iLink in range(0, parentIndex_file.shape[0]) :
-                    
-                    if len(np.where(np.logical_and(parentIndex_file == parentIndex_file[iLink], childIndex_file == childIndex_file[iLink]))[0]) != 4 :
-                        continue
-
-                    # If we have moved onto a new group...
-                    if ((currentParent != parentIndex_file[iLink]) or (currentChild != childIndex_file[iLink])) :
-                        
-                        if (linksMadeCounter != 0) and (linksMadeCounter != 4) :
-                            print('FAILURE ON IEVENT:', iEvent)
-                            raise
-                        
-                        # set the common vars
-                        parentTrackScore.append(parentTrackScore_file[iLink])
-                        childTrackScore.append(childTrackScore_file[childIndex_file[iLink]])
-                        parentNSpacepoints.append(parentNSpacepoints_file[iLink])
-                        childNSpacepoints.append(childNSpacepoints_file[iLink])
-                        separation3D.append(separation3D_file[iLink])
-                        pidLinkType.append(pidLinkType_file[iLink])
-                        trueParentChildLink.append(trueParentChildLink_file[iLink])
-                        
-                        currentParent = parentIndex_file[iLink]
-                        currentChild = childIndex_file[iLink]
-                        trueParentVisibleGeneration.append(trueVisibleGeneration_file[currentParent])
-                        trueChildVisibleGeneration.append(trueVisibleGeneration_file[currentChild])
-                    
-                    # Set truth
-                    if (trueParentChildLink_file[iLink] and isLinkOrientationCorrect_file[iLink]) :
-                        this_y[order[linksMadeCounter]] = 1 
-                    elif (trueParentChildLink_file[iLink] and (not isLinkOrientationCorrect_file[iLink])) :
-                        this_y[order[linksMadeCounter]] = 2
-                        
-                    this_isLinkOrientationCorrect[order[linksMadeCounter]] = isLinkOrientationCorrect_file[iLink]
-                    
-                    # set the link information
-                    parentNuVertexSep[order[linksMadeCounter]].append(parentNuVertexSep_file[iLink])
-                    childNuVertexSep[order[linksMadeCounter]].append(childNuVertexSep_file[iLink])
-                    parentEndRegionNHits[order[linksMadeCounter]].append(parentEndRegionNHits_file[iLink])
-                    parentEndRegionNParticles[order[linksMadeCounter]].append(parentEndRegionNParticles_file[iLink])
-                    parentEndRegionRToWall[order[linksMadeCounter]].append(parentEndRegionRToWall_file[iLink])
-                    vertexSeparation[order[linksMadeCounter]].append(vertexSeparation_file[iLink])
-                    doesChildConnect[order[linksMadeCounter]].append(doesChildConnect_file[iLink])
-                    overshootStartDCA[order[linksMadeCounter]].append(overshootStartDCA_file[iLink])
-                    overshootStartL[order[linksMadeCounter]].append(overshootStartL_file[iLink])
-                    overshootEndDCA[order[linksMadeCounter]].append(overshootEndDCA_file[iLink])
-                    overshootEndL[order[linksMadeCounter]].append(overshootEndL_file[iLink])
-                    childConnectionDCA[order[linksMadeCounter]].append(childConnectionDCA_file[iLink])
-                    childConnectionExtrapDistance[order[linksMadeCounter]].append(childConnectionExtrapDistance_file[iLink])
-                    childConnectionLRatio[order[linksMadeCounter]].append(childConnectionLRatio_file[iLink])
-                    parentConnectionPointNUpstreamHits[order[linksMadeCounter]].append(parentConnectionPointNUpstreamHits_file[iLink])
-                    parentConnectionPointNDownstreamHits[order[linksMadeCounter]].append(parentConnectionPointNDownstreamHits_file[iLink])
-                    parentConnectionPointNHitRatio[order[linksMadeCounter]].append(parentConnectionPointNHitRatio_file[iLink])
-                    parentConnectionPointEigenValueRatio[order[linksMadeCounter]].append(parentConnectionPointEigenValueRatio_file[iLink])
-                    parentConnectionPointOpeningAngle[order[linksMadeCounter]].append(parentConnectionPointOpeningAngle_file[iLink])
-                    parentIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isParentPOIClosestToNu_file[iLink] else 0)
-                    childIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isChildPOIClosestToNu_file[iLink] else 0)
-                    
-                    # Add in training cuts 
-                    if (isLinkOrientationCorrect_file[iLink]) :
-                        trainingCutSep.append(separation3D_file[iLink])
-                        trainingCutDoesConnect.append(doesChildConnect_file[iLink])
-                        trainingCutL.append(trainingCutL_file[iLink])
-                        trainingCutT.append(trainingCutT_file[iLink])
-
-                    linksMadeCounter = linksMadeCounter + 1
-                    
-                    if (linksMadeCounter == 4) :
-                        y.append(this_y)
-                        isLinkOrientationCorrect.append(this_isLinkOrientationCorrect)
-                        
-                        # reset                        
-                        linksMadeCounter = 0
-                        this_y = [0, 0, 0, 0]
-                        this_isLinkOrientationCorrect = [0, 0, 0, 0]
-                        order = shuffle(order)
+                order = shuffle(order)
                         
     ###################################
     # Now turn things into numpy arrays
     ###################################
     # Node variables
-    parentTrackScore = np.array(parentTrackScore)    
-    childTrackScore = np.array(childTrackScore)
-    parentNSpacepoints = np.array(parentNSpacepoints)
-    childNSpacepoints = np.array(childNSpacepoints)
-    parentNuVertexSep = np.array(parentNuVertexSep)
-    childNuVertexSep = np.array(childNuVertexSep)    
-    parentEndRegionNHits = np.array(parentEndRegionNHits)
-    parentEndRegionNParticles = np.array(parentEndRegionNParticles)
-    parentEndRegionRToWall = np.array(parentEndRegionRToWall)
-    vertexSeparation = np.array(vertexSeparation)
-    separation3D = np.array(separation3D)
+    parentTrackScore = np.array(parentTrackScore, dtype='float64')
+    childTrackScore = np.array(childTrackScore, dtype='float64')
+    parentNSpacepoints = np.array(parentNSpacepoints, dtype='float64')
+    childNSpacepoints = np.array(childNSpacepoints, dtype='float64')
+    separation3D = np.array(separation3D, dtype='float64')
+    parentNuVertexSep = np.array(parentNuVertexSep, dtype='float64')
+    childNuVertexSep = np.array(childNuVertexSep, dtype='float64')    
+    parentEndRegionNHits = np.array(parentEndRegionNHits, dtype='float64')
+    parentEndRegionNParticles = np.array(parentEndRegionNParticles, dtype='float64')
+    parentEndRegionRToWall = np.array(parentEndRegionRToWall, dtype='float64')
+    vertexSeparation = np.array(vertexSeparation, dtype='float64')    
     doesChildConnect = np.array(doesChildConnect, dtype='float64')
     overshootStartDCA = np.array(overshootStartDCA, dtype='float64')
-    overshootStartL = np.array(overshootStartL)
+    overshootStartL = np.array(overshootStartL, dtype='float64')
     overshootEndDCA = np.array(overshootEndDCA, dtype='float64')
-    overshootEndL = np.array(overshootEndL)    
+    overshootEndL = np.array(overshootEndL, dtype='float64')    
     childConnectionDCA = np.array(childConnectionDCA, dtype='float64')
-    childConnectionExtrapDistance = np.array(childConnectionExtrapDistance)
-    childConnectionLRatio = np.array(childConnectionLRatio)
-    parentConnectionPointNUpstreamHits = np.array(parentConnectionPointNUpstreamHits)
-    parentConnectionPointNDownstreamHits = np.array(parentConnectionPointNDownstreamHits)
-    parentConnectionPointNHitRatio = np.array(parentConnectionPointNHitRatio)
-    parentConnectionPointEigenValueRatio = np.array(parentConnectionPointEigenValueRatio)
-    parentConnectionPointOpeningAngle = np.array(parentConnectionPointOpeningAngle)
-    parentIsPOIClosestToNu = np.array(parentIsPOIClosestToNu, dtype='int')
-    childIsPOIClosestToNu = np.array(childIsPOIClosestToNu, dtype='int')
-    pidLinkType = np.array(pidLinkType)
+    childConnectionExtrapDistance = np.array(childConnectionExtrapDistance, dtype='float64')
+    childConnectionLRatio = np.array(childConnectionLRatio, dtype='float64')
+    parentConnectionPointNUpstreamHits = np.array(parentConnectionPointNUpstreamHits, dtype='float64')
+    parentConnectionPointNDownstreamHits = np.array(parentConnectionPointNDownstreamHits, dtype='float64')
+    parentConnectionPointNHitRatio = np.array(parentConnectionPointNHitRatio, dtype='float64')
+    parentConnectionPointEigenValueRatio = np.array(parentConnectionPointEigenValueRatio, dtype='float64')
+    parentConnectionPointOpeningAngle = np.array(parentConnectionPointOpeningAngle, dtype='float64')
+    parentIsPOIClosestToNu = np.array(parentIsPOIClosestToNu, dtype='float64')
+    childIsPOIClosestToNu = np.array(childIsPOIClosestToNu, dtype='float64')
     # Training cut variables
-    trainingCutSep = np.array(trainingCutSep)
+    trainingCutSep = np.array(trainingCutSep, dtype='float64')
     trainingCutDoesConnect = np.array(trainingCutDoesConnect, dtype='int')
-    trainingCutL = np.array(trainingCutL)
-    trainingCutT = np.array(trainingCutT)
+    trainingCutL = np.array(trainingCutL, dtype='float64')
+    trainingCutT = np.array(trainingCutT, dtype='float64')
     # Truth 
-    trueParentVisibleGeneration = np.array(trueParentVisibleGeneration, dtype='int')
     trueChildVisibleGeneration = np.array(trueChildVisibleGeneration, dtype='int')
     trueParentChildLink = np.array(trueParentChildLink, dtype='int')
     isLinkOrientationCorrect = np.array(isLinkOrientationCorrect, dtype='int')
@@ -415,31 +301,31 @@ def readTreeGroupLinks_track(fileNames) :
     ###################################
     # Normalise variables
     ###################################
-    normaliseXAxis(parentTrackScore, parentTrackScore_min, parentTrackScore_max)
-    normaliseXAxis(childTrackScore, parentTrackScore_min, parentTrackScore_max)    
-    normaliseXAxis(parentNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max)   
-    normaliseXAxis(childNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max) 
-    normaliseXAxis(parentNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max) 
-    normaliseXAxis(childNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max)        
-    normaliseXAxis(parentEndRegionNHits, parentEndRegionNHits_min, parentEndRegionNHits_max)
-    normaliseXAxis(parentEndRegionNParticles, parentEndRegionNParticles_min, parentEndRegionNParticles_max)
-    normaliseXAxis(parentEndRegionRToWall, parentEndRegionRToWall_min, parentEndRegionRToWall_max)
-    normaliseXAxis(vertexSeparation, vertexSeparation_min, vertexSeparation_max)
-    normaliseXAxis(separation3D, separation3D_min, separation3D_max)
-    normaliseXAxis(doesChildConnect, doesChildConnect_min, doesChildConnect_max)
-    normaliseXAxis(overshootStartDCA, overshootDCA_min, overshootDCA_max)
-    normaliseXAxis(overshootStartL, overshootL_min, overshootL_max)
-    normaliseXAxis(overshootEndDCA, overshootDCA_min, overshootDCA_max)
-    normaliseXAxis(overshootEndL, overshootL_min, overshootL_max)
-    normaliseXAxis(childConnectionDCA, childConnectionDCA_min, childConnectionDCA_max)
-    normaliseXAxis(childConnectionExtrapDistance, childConnectionExtrapDistance_min, childConnectionExtrapDistance_max)
-    normaliseXAxis(childConnectionLRatio, childConnectionLRatio_min, childConnectionLRatio_max)
-    normaliseXAxis(parentConnectionPointNUpstreamHits, parentConnectionPointNUpstreamHits_min, parentConnectionPointNUpstreamHits_max)
-    normaliseXAxis(parentConnectionPointNDownstreamHits, parentConnectionPointNDownstreamHits_min, parentConnectionPointNDownstreamHits_max)
-    normaliseXAxis(parentConnectionPointNHitRatio, parentConnectionPointNHitRatio_min, parentConnectionPointNHitRatio_max)
-    normaliseXAxis(parentConnectionPointEigenValueRatio, parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
-    normaliseXAxis(parentConnectionPointOpeningAngle, parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
-    normaliseXAxis(pidLinkType, pidLinkType_min, pidLinkType_max)
+    if (normalise) :
+        normaliseXAxis(parentTrackScore, parentTrackScore_min, parentTrackScore_max)
+        normaliseXAxis(childTrackScore, parentTrackScore_min, parentTrackScore_max)    
+        normaliseXAxis(parentNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max)   
+        normaliseXAxis(childNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max) 
+        normaliseXAxis(parentNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max) 
+        normaliseXAxis(childNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max)        
+        normaliseXAxis(separation3D, separation3D_min, separation3D_max)                                                  
+        normaliseXAxis(parentEndRegionNHits, parentEndRegionNHits_min, parentEndRegionNHits_max)
+        normaliseXAxis(parentEndRegionNParticles, parentEndRegionNParticles_min, parentEndRegionNParticles_max)
+        normaliseXAxis(parentEndRegionRToWall, parentEndRegionRToWall_min, parentEndRegionRToWall_max)
+        normaliseXAxis(vertexSeparation, vertexSeparation_min, vertexSeparation_max)
+        normaliseXAxis(doesChildConnect, doesChildConnect_min, doesChildConnect_max)
+        normaliseXAxis(overshootStartDCA, overshootDCA_min, overshootDCA_max)
+        normaliseXAxis(overshootStartL, overshootL_min, overshootL_max)
+        normaliseXAxis(overshootEndDCA, overshootDCA_min, overshootDCA_max)
+        normaliseXAxis(overshootEndL, overshootL_min, overshootL_max)
+        normaliseXAxis(childConnectionDCA, childConnectionDCA_min, childConnectionDCA_max)
+        normaliseXAxis(childConnectionExtrapDistance, childConnectionExtrapDistance_min, childConnectionExtrapDistance_max)
+        normaliseXAxis(childConnectionLRatio, childConnectionLRatio_min, childConnectionLRatio_max)
+        normaliseXAxis(parentConnectionPointNUpstreamHits, parentConnectionPointNUpstreamHits_min, parentConnectionPointNUpstreamHits_max)
+        normaliseXAxis(parentConnectionPointNDownstreamHits, parentConnectionPointNDownstreamHits_min, parentConnectionPointNDownstreamHits_max)
+        normaliseXAxis(parentConnectionPointNHitRatio, parentConnectionPointNHitRatio_min, parentConnectionPointNHitRatio_max)
+        normaliseXAxis(parentConnectionPointEigenValueRatio, parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
+        normaliseXAxis(parentConnectionPointOpeningAngle, parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
 
     ###################################
     # Concatenate
@@ -535,15 +421,14 @@ def readTreeGroupLinks_track(fileNames) :
                                 parentNSpacepoints.reshape(nLinks, 1), \
                                 childNSpacepoints.reshape(nLinks, 1), \
                                 separation3D.reshape(nLinks, 1), \
-                                pidLinkType.reshape(nLinks, 1), \
                                 coc0), axis=1)
     
-    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect, trueParentVisibleGeneration, trueChildVisibleGeneration, trainingCutSep, trainingCutDoesConnect, trainingCutL, trainingCutT
+    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect, trueChildVisibleGeneration, trainingCutSep, trainingCutDoesConnect, trainingCutL, trainingCutT
 
 ############################################################################################################################################
 ############################################################################################################################################
 
-def readTreeGroupLinks_shower(fileNames) :
+def readTreeGroupLinks_shower(fileNames, normalise) :
 
     ###################################
     # To pull out of tree
@@ -553,13 +438,13 @@ def readTreeGroupLinks_shower(fileNames) :
     childTrackScore = []
     parentNSpacepoints = []
     childNSpacepoints = []
+    separation3D = []
     parentNuVertexSep = [[], []]
     childNuVertexSep = [[], []]
     parentEndRegionNHits = [[], []]
     parentEndRegionNParticles = [[], []]
     parentEndRegionRToWall = [[], []]
     vertexSeparation = [[], []]
-    separation3D = []
     doesChildConnect = [[], []]
     overshootStartDCA = [[], []]
     overshootStartL = [[], []]
@@ -575,7 +460,6 @@ def readTreeGroupLinks_shower(fileNames) :
     parentConnectionPointOpeningAngle = [[], []]
     parentIsPOIClosestToNu = [[], []]
     childIsPOIClosestToNu = [[], []]
-    pidLinkType = []
     # Training cut variables
     trainingCutSep = []
     trainingCutDoesConnect = []
@@ -585,278 +469,171 @@ def readTreeGroupLinks_shower(fileNames) :
     trueParentChildLink = []
     isLinkOrientationCorrect = []
     y = []
-    trueParentVisibleGeneration = []
     trueChildVisibleGeneration = []
     
     for fileName in fileNames :
         print('Reading tree: ', str(fileName),', This may take a while...')
-    
+        
+        ####################################
+        # Set tree
+        ####################################  
         treeFile = uproot.open(fileName)
-        tree = treeFile['ccnuselection/ccnusel']
+        tree = treeFile['LaterTierTrackShowerTree']
         branches = tree.arrays()
+
+        ####################################
+        # Set tree branches
+        ####################################
+        # Network vars
+        parentTrackScore_file = np.array(branches['ParentTrackScore'])            
+        childTrackScore_file = np.array(branches['ChildTrackScore'])
+        parentNSpacepoints_file = np.array(branches['ParentNSpacepoints'])
+        childNSpacepoints_file = np.array(branches['ChildNSpacepoints'])
+        separation3D_file = np.array(branches['Separation3D'])
+        parentNuVertexSep_file = np.array(branches['ParentNuVertexSep'])
+        childNuVertexSep_file = np.array(branches['ChildNuVertexSep'])                        
+        parentEndRegionNHits_file = np.array(branches['ParentEndRegionNHits'])
+        parentEndRegionNParticles_file = np.array(branches['ParentEndRegionNParticles'])
+        parentEndRegionRToWall_file = np.array(branches['ParentEndRegionRToWall'])
+        vertexSeparation_file = np.array(branches['VertexSeparation'])        
+        doesChildConnect_file = np.array(branches['DoesChildConnect'])
+        overshootStartDCA_file = np.array(branches['OvershootStartDCA'])
+        overshootStartL_file = np.array(branches['OvershootStartL'])
+        overshootEndDCA_file = np.array(branches['OvershootEndDCA'])
+        overshootEndL_file = np.array(branches['OvershootEndL'])
+        childConnectionDCA_file = np.array(branches['ChildCPDCA'])
+        childConnectionExtrapDistance_file = np.array(branches['ChildCPExtrapDistance'])
+        childConnectionLRatio_file = np.array(branches['ChildCPLRatio'])
+        parentConnectionPointNUpstreamHits_file = np.array(branches['ParentCPNUpstreamHits'])
+        parentConnectionPointNDownstreamHits_file = np.array(branches['ParentCPNDownstreamHits'])
+        parentConnectionPointNHitRatio_file = np.array(branches['ParentCPNHitRatio'])
+        parentConnectionPointEigenValueRatio_file = np.array(branches['ParentCPEigenvalueRatio'])
+        parentConnectionPointOpeningAngle_file = np.array(branches['ParentCPOpeningAngle'])
+        isParentPOIClosestToNu_file = np.array(branches['ParentIsPOIClosestToNu'])
+        isChildPOIClosestToNu_file = np.array(branches['ChildIsPOIClosestToNu'])
+        # Truth
+        trueParentChildLink_file = np.array(branches['IsTrueLink'])
+        trueVisibleGeneration_file = np.array(branches['ChildTrueVisibleGeneration'])
+        isLinkOrientationCorrect_file = np.array(branches['IsOrientationCorrect'])
+        # Training cuts!
+        trainingCutL_file = np.array(branches['TrainingCutL'])
+        trainingCutT_file = np.array(branches['TrainingCutT'])
+        # nLinks
+        nLinks_file = trueParentChildLink_file.shape[0]
         
-        nEvents = len(branches)
-        
-        for iEvent in range(nEvents) :
-            
-            if ((iEvent % 100) == 0) :
-                print('iEvent:', str(iEvent) + '/' + str(nEvents))
-            
-            # Failed to find a nu vertex?
-            if (branches['RecoNuVtxZ'][iEvent] < -900) :
-                continue
-            
-            # Nu vertex vars - to work out separation
-            dX = branches['RecoNuVtxX'][iEvent] - branches['NuX'][iEvent]
-            dY = branches['RecoNuVtxY'][iEvent] - branches['NuY'][iEvent]
-            dZ = branches['RecoNuVtxZ'][iEvent] - branches['NuZ'][iEvent]
-            sep = math.sqrt((dX * dX) + (dY * dY) + (dZ * dZ)) 
-            
-            if (sep > 5.0) :
-                continue
-                
-            # To establish orientation of particles wrt the neutrino vertex
-            recoNuVertex = np.array([branches['RecoNuVtxX'][iEvent], branches['RecoNuVtxY'][iEvent], branches['RecoNuVtxZ'][iEvent]])
-                
-            # We don't want this to be masked, otherwise the indices will be wrong! 
-            trueVisibleGeneration_file = np.array(branches['RecoPFPTrueVisibleGeneration'][iEvent])                
-                
-            ##################################################################
-            # DEFINE THEM ALL HERE - apply track-track or track-shower mask
-            ##################################################################
-            trackShowerLinkType_file = np.array(branches['TrackShowerLinkType'][iEvent])
-            trackShowerLinkType_mask = (trackShowerLinkType_file == 1)
-                
-            if (np.count_nonzero(trackShowerLinkType_mask) == 0) :
-                continue
-                
-            ##################################################################    
-            parentIndex_file = np.array(branches['ParentPFPIndex'][iEvent][trackShowerLinkType_mask])
-            childIndex_file = np.array(branches['ChildPFPIndex'][iEvent][trackShowerLinkType_mask])
-            parentTrackScore_file = np.array(branches['ParentTrackScore'][iEvent][trackShowerLinkType_mask])
-            childTrackScore_file = np.array(branches['RecoPFPTrackShowerScore'][iEvent]) # Do not want to mask this
-            parentNSpacepoints_file = np.array(branches['ParentNSpacepoints'][iEvent][trackShowerLinkType_mask])
-            childNSpacepoints_file = np.array(branches['ChildNSpacepoints'][iEvent][trackShowerLinkType_mask])
-            parentNuVertexSep_file = np.array(branches['ParentNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
-            childNuVertexSep_file = np.array(branches['ChildNuVertexSeparation'][iEvent][trackShowerLinkType_mask])
-            parentEndRegionNHits_file = np.array(branches['ParentEndRegionNHits'][iEvent][trackShowerLinkType_mask])
-            parentEndRegionNParticles_file = np.array(branches['ParentEndRegionNParticles'][iEvent][trackShowerLinkType_mask])
-            parentEndRegionRToWall_file = np.array(branches['ParentEndRegionRToWall'][iEvent][trackShowerLinkType_mask])
-            vertexSeparation_file = np.array(branches['VertexSeparation'][iEvent][trackShowerLinkType_mask])
-            separation3D_file = np.array(branches['Separation3D'][iEvent][trackShowerLinkType_mask])
-            doesChildConnect_file = np.array(branches['DoesChildConnect'][iEvent][trackShowerLinkType_mask])
-            overshootStartDCA_file = np.array(branches['OvershootStartDCA'][iEvent][trackShowerLinkType_mask])
-            overshootStartL_file = np.array(branches['OvershootStartL'][iEvent][trackShowerLinkType_mask])
-            overshootEndDCA_file = np.array(branches['OvershootEndDCA'][iEvent][trackShowerLinkType_mask])
-            overshootEndL_file = np.array(branches['OvershootEndL'][iEvent][trackShowerLinkType_mask])
-            childConnectionDCA_file = np.array(branches['ChildConnectionDCA'][iEvent][trackShowerLinkType_mask])
-            childConnectionExtrapDistance_file = np.array(branches['ChildConnectionExtrapDistance'][iEvent][trackShowerLinkType_mask])
-            childConnectionLRatio_file = np.array(branches['ChildConnectionLRatio'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointNUpstreamHits_file = np.array(branches['ParentConnectionPointNUpstreamHits'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointNDownstreamHits_file = np.array(branches['ParentConnectionPointNDownstreamHits'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointNHitRatio_file = np.array(branches['ParentConnectionPointNHitRatio'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointEigenValueRatio_file = np.array(branches['ParentConnectionPointEigenValueRatio'][iEvent][trackShowerLinkType_mask])
-            parentConnectionPointOpeningAngle_file = np.array(branches['ParentConnectionPointOpeningAngle'][iEvent][trackShowerLinkType_mask])
-            isParentPOIClosestToNu_file = np.array(branches['IsParentPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
-            isChildPOIClosestToNu_file = np.array(branches['IsChildPOIClosestToNu'][iEvent][trackShowerLinkType_mask])
-            pidLinkType_file = np.array(branches['PIDLinkType'][iEvent][trackShowerLinkType_mask])
-            trueParentChildLink_file = np.array(branches['TrueParentChildLink'][iEvent][trackShowerLinkType_mask])
-            isLinkOrientationCorrect_file = np.array(branches['IsLinkOrientationCorrect'][iEvent][trackShowerLinkType_mask])
-            # Topology 
-            childStartX_file = np.array(branches['ChildStartX'][iEvent][trackShowerLinkType_mask])
-            childStartY_file = np.array(branches['ChildStartY'][iEvent][trackShowerLinkType_mask])
-            childStartZ_file = np.array(branches['ChildStartZ'][iEvent][trackShowerLinkType_mask])
-            childStartDX_file = np.array(branches['ChildStartDX'][iEvent][trackShowerLinkType_mask])
-            childStartDY_file = np.array(branches['ChildStartDY'][iEvent][trackShowerLinkType_mask])
-            childStartDZ_file = np.array(branches['ChildStartDZ'][iEvent][trackShowerLinkType_mask])
-            parentEndX_file = np.array(branches['ParentEndX'][iEvent][trackShowerLinkType_mask])
-            parentEndY_file = np.array(branches['ParentEndY'][iEvent][trackShowerLinkType_mask])
-            parentEndZ_file = np.array(branches['ParentEndZ'][iEvent][trackShowerLinkType_mask])
-            parentEndDX_file = np.array(branches['ParentEndDX'][iEvent][trackShowerLinkType_mask])
-            parentEndDY_file = np.array(branches['ParentEndDY'][iEvent][trackShowerLinkType_mask])
-            parentEndDZ_file = np.array(branches['ParentEndDZ'][iEvent][trackShowerLinkType_mask])
-            # Training cuts!
-            trainingCutL_file = np.array(branches['TrainingCutL'][iEvent][trackShowerLinkType_mask])
-            trainingCutT_file = np.array(branches['TrainingCutT'][iEvent][trackShowerLinkType_mask])
-            ##################################################################
-            # DEFINE THEM ALL HERE - apply generation mask
-            ##################################################################
-            # I want to discount child primaries from the training
-            trainingChild_mask = []
-            for childIndex in childIndex_file :
-                trainingChild_mask.append(branches['RecoPFPTrueVisibleGeneration'][iEvent][childIndex] != 2)
-            
-            trainingChild_mask = np.array(trainingChild_mask)
-            
-            if (np.count_nonzero(trainingChild_mask) == 0) :
-                continue
-            
-            parentIndex_file = parentIndex_file[trainingChild_mask]
-            childIndex_file = childIndex_file[trainingChild_mask]
-            parentTrackScore_file = parentTrackScore_file[trainingChild_mask]
-            parentNSpacepoints_file = parentNSpacepoints_file[trainingChild_mask]
-            childNSpacepoints_file = childNSpacepoints_file[trainingChild_mask]
-            parentNuVertexSep_file = parentNuVertexSep_file[trainingChild_mask]
-            childNuVertexSep_file = childNuVertexSep_file[trainingChild_mask]
-            parentEndRegionNHits_file = parentEndRegionNHits_file[trainingChild_mask]
-            parentEndRegionNParticles_file = parentEndRegionNParticles_file[trainingChild_mask]
-            parentEndRegionRToWall_file = parentEndRegionRToWall_file[trainingChild_mask]
-            vertexSeparation_file = vertexSeparation_file[trainingChild_mask]
-            separation3D_file = separation3D_file[trainingChild_mask]
-            doesChildConnect_file = doesChildConnect_file[trainingChild_mask]
-            overshootStartDCA_file = overshootStartDCA_file[trainingChild_mask]
-            overshootStartL_file = overshootStartL_file[trainingChild_mask]
-            overshootEndDCA_file = overshootEndDCA_file[trainingChild_mask]
-            overshootEndL_file = overshootEndL_file[trainingChild_mask]
-            childConnectionDCA_file = childConnectionDCA_file[trainingChild_mask]
-            childConnectionExtrapDistance_file = childConnectionExtrapDistance_file[trainingChild_mask]
-            childConnectionLRatio_file = childConnectionLRatio_file[trainingChild_mask]
-            parentConnectionPointNUpstreamHits_file = parentConnectionPointNUpstreamHits_file[trainingChild_mask]
-            parentConnectionPointNDownstreamHits_file = parentConnectionPointNDownstreamHits_file[trainingChild_mask]
-            parentConnectionPointNHitRatio_file = parentConnectionPointNHitRatio_file[trainingChild_mask]
-            parentConnectionPointEigenValueRatio_file = parentConnectionPointEigenValueRatio_file[trainingChild_mask]
-            parentConnectionPointOpeningAngle_file = parentConnectionPointOpeningAngle_file[trainingChild_mask]
-            isParentPOIClosestToNu_file = isParentPOIClosestToNu_file[trainingChild_mask]
-            isChildPOIClosestToNu_file = isChildPOIClosestToNu_file[trainingChild_mask]
-            pidLinkType_file = pidLinkType_file[trainingChild_mask]
-            trueParentChildLink_file = trueParentChildLink_file[trainingChild_mask]
-            isLinkOrientationCorrect_file = isLinkOrientationCorrect_file[trainingChild_mask]
-            # Topology
-            childStartX_file = childStartX_file[trainingChild_mask]
-            childStartY_file = childStartY_file[trainingChild_mask]
-            childStartZ_file = childStartZ_file[trainingChild_mask]
-            childStartDX_file = childStartDX_file[trainingChild_mask]
-            childStartDY_file = childStartDY_file[trainingChild_mask]
-            childStartDZ_file = childStartDZ_file[trainingChild_mask]
-            parentEndX_file = parentEndX_file[trainingChild_mask]
-            parentEndY_file = parentEndY_file[trainingChild_mask]
-            parentEndZ_file = parentEndZ_file[trainingChild_mask]
-            parentEndDX_file = parentEndDX_file[trainingChild_mask]
-            parentEndDY_file = parentEndDY_file[trainingChild_mask]
-            parentEndDZ_file = parentEndDZ_file[trainingChild_mask]
-            # Training cuts!
-            trainingCutL_file = trainingCutL_file[trainingChild_mask]
-            trainingCutT_file = trainingCutT_file[trainingChild_mask]
-            
-            ####################################
-            # Now loop over loops to group them.
-            ####################################
-            if (parentIndex_file.shape[0] != 0) :
-                currentParent = -1
-                currentChild = -1
+        ####################################
+        # Now loop over loops to group them.
+        ####################################
+        linksMadeCounter = 0
+        this_y = [0, 0]
+        this_isLinkOrientationCorrect = [0, 0]
+        order = [0, 1]
+
+        for iLink in range(0, nLinks_file) :
+                                                  
+            if ((iLink % 100) == 0) :
+                print('iLink:', str(iLink) + '/' + str(nLinks_file)) 
+                    
+            # Set truth                                                  
+            trueParentChildLink_bool = math.isclose(trueParentChildLink_file[iLink], 1.0, rel_tol=0.001)
+            isLinkOrientationCorrect_bool = math.isclose(isLinkOrientationCorrect_file[iLink], 1.0, rel_tol=0.001)
+                       
+            if (trueParentChildLink_bool and isLinkOrientationCorrect_bool) :
+                this_y[order[linksMadeCounter]] = 1 
+            elif (trueParentChildLink_bool and (not isLinkOrientationCorrect_bool)) :
+                this_y[order[linksMadeCounter]] = 2
+
+            this_isLinkOrientationCorrect[order[linksMadeCounter]] = isLinkOrientationCorrect_bool  
+             
+            # set the link information
+            parentNuVertexSep[order[linksMadeCounter]].append(parentNuVertexSep_file[iLink])
+            childNuVertexSep[order[linksMadeCounter]].append(childNuVertexSep_file[iLink])
+            parentEndRegionNHits[order[linksMadeCounter]].append(parentEndRegionNHits_file[iLink])
+            parentEndRegionNParticles[order[linksMadeCounter]].append(parentEndRegionNParticles_file[iLink])
+            parentEndRegionRToWall[order[linksMadeCounter]].append(parentEndRegionRToWall_file[iLink])
+            vertexSeparation[order[linksMadeCounter]].append(vertexSeparation_file[iLink])
+            doesChildConnect[order[linksMadeCounter]].append(doesChildConnect_file[iLink])
+            overshootStartDCA[order[linksMadeCounter]].append(overshootStartDCA_file[iLink])
+            overshootStartL[order[linksMadeCounter]].append(overshootStartL_file[iLink])
+            overshootEndDCA[order[linksMadeCounter]].append(overshootEndDCA_file[iLink])
+            overshootEndL[order[linksMadeCounter]].append(overshootEndL_file[iLink])
+            childConnectionDCA[order[linksMadeCounter]].append(childConnectionDCA_file[iLink])
+            childConnectionExtrapDistance[order[linksMadeCounter]].append(childConnectionExtrapDistance_file[iLink])
+            childConnectionLRatio[order[linksMadeCounter]].append(childConnectionLRatio_file[iLink])
+            parentConnectionPointNUpstreamHits[order[linksMadeCounter]].append(parentConnectionPointNUpstreamHits_file[iLink])
+            parentConnectionPointNDownstreamHits[order[linksMadeCounter]].append(parentConnectionPointNDownstreamHits_file[iLink])
+            parentConnectionPointNHitRatio[order[linksMadeCounter]].append(parentConnectionPointNHitRatio_file[iLink])
+            parentConnectionPointEigenValueRatio[order[linksMadeCounter]].append(parentConnectionPointEigenValueRatio_file[iLink])
+            parentConnectionPointOpeningAngle[order[linksMadeCounter]].append(parentConnectionPointOpeningAngle_file[iLink])
+            isParentPOIClosestToNu_bool = math.isclose(isParentPOIClosestToNu_file[iLink], 1.0, rel_tol=0.001)
+            parentIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isParentPOIClosestToNu_bool else 0)
+            isChildPOIClosestToNu_bool = math.isclose(isChildPOIClosestToNu_file[iLink], 1.0, rel_tol=0.001)
+            childIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isChildPOIClosestToNu_bool else 0)
+                    
+            # Add in training cuts 
+            if (isLinkOrientationCorrect_bool) :
+                trainingCutSep.append(separation3D_file[iLink])
+                doesChildConnect_bool = math.isclose(doesChildConnect_file[iLink], 1.0, rel_tol=0.001)
+                trainingCutDoesConnect.append(doesChildConnect_bool)
+                trainingCutL.append(trainingCutL_file[iLink])
+                trainingCutT.append(trainingCutT_file[iLink])                                              
+
+            linksMadeCounter = linksMadeCounter + 1
+                    
+            if (linksMadeCounter == 2) :
+                # set the common vars
+                parentTrackScore.append(parentTrackScore_file[iLink])
+                childTrackScore.append(childTrackScore_file[iLink])
+                parentNSpacepoints.append(parentNSpacepoints_file[iLink])
+                childNSpacepoints.append(childNSpacepoints_file[iLink])
+                separation3D.append(separation3D_file[iLink])                                                  
+                # set truth                                                                          
+                trueChildVisibleGeneration.append(trueVisibleGeneration_file[iLink])        
+                y.append(this_y)
+                trueParentChildLink.append(trueParentChildLink_bool)
+                isLinkOrientationCorrect.append(this_isLinkOrientationCorrect)                        
+                # reset                        
                 linksMadeCounter = 0
-                
                 this_y = [0, 0]
                 this_isLinkOrientationCorrect = [0, 0]
-                order = [0, 1]
+                order = shuffle(order)
 
-                for iLink in range(0, parentIndex_file.shape[0]) :
-                    
-                    # If we have moved onto a new group...
-                    if ((currentParent != parentIndex_file[iLink]) or (currentChild != childIndex_file[iLink])) :
-                            
-                        # set the common vars
-                        parentTrackScore.append(parentTrackScore_file[iLink])
-                        childTrackScore.append(childTrackScore_file[childIndex_file[iLink]])
-                        parentNSpacepoints.append(parentNSpacepoints_file[iLink])
-                        childNSpacepoints.append(childNSpacepoints_file[iLink])
-                        separation3D.append(separation3D_file[iLink])
-                        pidLinkType.append(pidLinkType_file[iLink])
-                        trueParentChildLink.append(trueParentChildLink_file[iLink])                        
-                                               
-                        currentParent = parentIndex_file[iLink]
-                        currentChild = childIndex_file[iLink]
-                        trueParentVisibleGeneration.append(trueVisibleGeneration_file[currentParent])
-                        trueChildVisibleGeneration.append(trueVisibleGeneration_file[currentChild])                    
-                    
-                    # Set truth
-                    if (trueParentChildLink_file[iLink] and isLinkOrientationCorrect_file[iLink]) :
-                        this_y[order[linksMadeCounter]] = 1 
-                    elif (trueParentChildLink_file[iLink] and (not isLinkOrientationCorrect_file[iLink])) :
-                        this_y[order[linksMadeCounter]] = 2
-
-                    this_isLinkOrientationCorrect[order[linksMadeCounter]] = isLinkOrientationCorrect_file[iLink]
-                    
-                    # set the link information
-                    parentNuVertexSep[order[linksMadeCounter]].append(parentNuVertexSep_file[iLink])
-                    childNuVertexSep[order[linksMadeCounter]].append(childNuVertexSep_file[iLink])                    
-                    parentEndRegionNHits[order[linksMadeCounter]].append(parentEndRegionNHits_file[iLink])
-                    parentEndRegionNParticles[order[linksMadeCounter]].append(parentEndRegionNParticles_file[iLink])
-                    parentEndRegionRToWall[order[linksMadeCounter]].append(parentEndRegionRToWall_file[iLink])
-                    vertexSeparation[order[linksMadeCounter]].append(vertexSeparation_file[iLink])
-                    doesChildConnect[order[linksMadeCounter]].append(doesChildConnect_file[iLink])
-                    overshootStartDCA[order[linksMadeCounter]].append(overshootStartDCA_file[iLink])
-                    overshootStartL[order[linksMadeCounter]].append(overshootStartL_file[iLink])
-                    overshootEndDCA[order[linksMadeCounter]].append(overshootEndDCA_file[iLink])
-                    overshootEndL[order[linksMadeCounter]].append(overshootEndL_file[iLink])
-                    childConnectionDCA[order[linksMadeCounter]].append(childConnectionDCA_file[iLink])
-                    childConnectionExtrapDistance[order[linksMadeCounter]].append(childConnectionExtrapDistance_file[iLink])
-                    childConnectionLRatio[order[linksMadeCounter]].append(childConnectionLRatio_file[iLink])
-                    parentConnectionPointNUpstreamHits[order[linksMadeCounter]].append(parentConnectionPointNUpstreamHits_file[iLink])
-                    parentConnectionPointNDownstreamHits[order[linksMadeCounter]].append(parentConnectionPointNDownstreamHits_file[iLink])
-                    parentConnectionPointNHitRatio[order[linksMadeCounter]].append(parentConnectionPointNHitRatio_file[iLink])
-                    parentConnectionPointEigenValueRatio[order[linksMadeCounter]].append(parentConnectionPointEigenValueRatio_file[iLink])
-                    parentConnectionPointOpeningAngle[order[linksMadeCounter]].append(parentConnectionPointOpeningAngle_file[iLink])
-                    parentIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isParentPOIClosestToNu_file[iLink] else 0)
-                    childIsPOIClosestToNu[order[linksMadeCounter]].append(1 if isChildPOIClosestToNu_file[iLink] else 0)
-
-                    # Calculate training cuts 
-                    if (isLinkOrientationCorrect_file[iLink]) :
-                        trainingCutSep.append(separation3D_file[iLink])
-                        trainingCutDoesConnect.append(doesChildConnect_file[iLink])
-                        trainingCutL.append(trainingCutL_file[iLink])
-                        trainingCutT.append(trainingCutT_file[iLink])
-                    
-                    linksMadeCounter = linksMadeCounter + 1
-                    
-                    if (linksMadeCounter == 2) :
-                        y.append(this_y)
-                        isLinkOrientationCorrect.append(this_isLinkOrientationCorrect)
-                        
-                        # reset                        
-                        linksMadeCounter = 0
-                        this_y = [0, 0]
-                        this_isLinkOrientationCorrect = [0, 0]
-                        order = shuffle(order)
-                        
     ###################################
     # Now turn things into numpy arrays
     ###################################
     # Node variables
-    parentTrackScore = np.array(parentTrackScore)
-    childTrackScore = np.array(childTrackScore)
-    parentNSpacepoints = np.array(parentNSpacepoints)
-    childNSpacepoints = np.array(childNSpacepoints)
-    parentNuVertexSep = np.array(parentNuVertexSep)
-    childNuVertexSep = np.array(childNuVertexSep)    
-    parentEndRegionNHits = np.array(parentEndRegionNHits)
-    parentEndRegionNParticles = np.array(parentEndRegionNParticles)
-    parentEndRegionRToWall = np.array(parentEndRegionRToWall)
-    vertexSeparation = np.array(vertexSeparation)
-    separation3D = np.array(separation3D)
+    parentTrackScore = np.array(parentTrackScore, dtype='float64')    
+    childTrackScore = np.array(childTrackScore, dtype='float64')
+    parentNSpacepoints = np.array(parentNSpacepoints, dtype='float64')
+    childNSpacepoints = np.array(childNSpacepoints, dtype='float64')
+    separation3D = np.array(separation3D, dtype='float64')
+    parentNuVertexSep = np.array(parentNuVertexSep, dtype='float64')
+    childNuVertexSep = np.array(childNuVertexSep, dtype='float64')    
+    parentEndRegionNHits = np.array(parentEndRegionNHits, dtype='float64')
+    parentEndRegionNParticles = np.array(parentEndRegionNParticles, dtype='float64')
+    parentEndRegionRToWall = np.array(parentEndRegionRToWall, dtype='float64')
+    vertexSeparation = np.array(vertexSeparation, dtype='float64')    
     doesChildConnect = np.array(doesChildConnect, dtype='float64')
     overshootStartDCA = np.array(overshootStartDCA, dtype='float64')
-    overshootStartL = np.array(overshootStartL)
+    overshootStartL = np.array(overshootStartL, dtype='float64')
     overshootEndDCA = np.array(overshootEndDCA, dtype='float64')
-    overshootEndL = np.array(overshootEndL)    
+    overshootEndL = np.array(overshootEndL, dtype='float64')    
     childConnectionDCA = np.array(childConnectionDCA, dtype='float64')
-    childConnectionExtrapDistance = np.array(childConnectionExtrapDistance)
-    childConnectionLRatio = np.array(childConnectionLRatio)
-    parentConnectionPointNUpstreamHits = np.array(parentConnectionPointNUpstreamHits)
-    parentConnectionPointNDownstreamHits = np.array(parentConnectionPointNDownstreamHits)
-    parentConnectionPointNHitRatio = np.array(parentConnectionPointNHitRatio)
-    parentConnectionPointEigenValueRatio = np.array(parentConnectionPointEigenValueRatio)
-    parentConnectionPointOpeningAngle = np.array(parentConnectionPointOpeningAngle)
-    parentIsPOIClosestToNu = np.array(parentIsPOIClosestToNu, dtype='int')
-    childIsPOIClosestToNu = np.array(childIsPOIClosestToNu, dtype='int')
-    pidLinkType = np.array(pidLinkType)
+    childConnectionExtrapDistance = np.array(childConnectionExtrapDistance, dtype='float64')
+    childConnectionLRatio = np.array(childConnectionLRatio, dtype='float64')
+    parentConnectionPointNUpstreamHits = np.array(parentConnectionPointNUpstreamHits, dtype='float64')
+    parentConnectionPointNDownstreamHits = np.array(parentConnectionPointNDownstreamHits, dtype='float64')
+    parentConnectionPointNHitRatio = np.array(parentConnectionPointNHitRatio, dtype='float64')
+    parentConnectionPointEigenValueRatio = np.array(parentConnectionPointEigenValueRatio, dtype='float64')
+    parentConnectionPointOpeningAngle = np.array(parentConnectionPointOpeningAngle, dtype='float64')
+    parentIsPOIClosestToNu = np.array(parentIsPOIClosestToNu, dtype='float64')
+    childIsPOIClosestToNu = np.array(childIsPOIClosestToNu, dtype='float64')
     # Training cut variables
-    trainingCutSep = np.array(trainingCutSep)
+    trainingCutSep = np.array(trainingCutSep, dtype='float64')
     trainingCutDoesConnect = np.array(trainingCutDoesConnect, dtype='int')
-    trainingCutL = np.array(trainingCutL)
-    trainingCutT = np.array(trainingCutT)
+    trainingCutL = np.array(trainingCutL, dtype='float64')
+    trainingCutT = np.array(trainingCutT, dtype='float64')
     # Truth 
-    trueParentVisibleGeneration = np.array(trueParentVisibleGeneration, dtype='int')
     trueChildVisibleGeneration = np.array(trueChildVisibleGeneration, dtype='int')
     trueParentChildLink = np.array(trueParentChildLink, dtype='int')
     isLinkOrientationCorrect = np.array(isLinkOrientationCorrect, dtype='int')
@@ -871,31 +648,31 @@ def readTreeGroupLinks_shower(fileNames) :
     ###################################
     # Normalise variables
     ###################################
-    normaliseXAxis(parentTrackScore, parentTrackScore_min, parentTrackScore_max)
-    normaliseXAxis(childTrackScore, parentTrackScore_min, parentTrackScore_max)    
-    normaliseXAxis(parentNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max)   
-    normaliseXAxis(childNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max) 
-    normaliseXAxis(parentNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max) 
-    normaliseXAxis(childNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max) 
-    normaliseXAxis(parentEndRegionNHits, parentEndRegionNHits_min, parentEndRegionNHits_max)
-    normaliseXAxis(parentEndRegionNParticles, parentEndRegionNParticles_min, parentEndRegionNParticles_max)
-    normaliseXAxis(parentEndRegionRToWall, parentEndRegionRToWall_min, parentEndRegionRToWall_max)
-    normaliseXAxis(vertexSeparation, vertexSeparation_min, vertexSeparation_max)
-    normaliseXAxis(separation3D, separation3D_min, separation3D_max)
-    normaliseXAxis(doesChildConnect, doesChildConnect_min, doesChildConnect_max)
-    normaliseXAxis(overshootStartDCA, overshootDCA_min, overshootDCA_max)
-    normaliseXAxis(overshootStartL, overshootL_min, overshootL_max)
-    normaliseXAxis(overshootEndDCA, overshootDCA_min, overshootDCA_max)
-    normaliseXAxis(overshootEndL, overshootL_min, overshootL_max)
-    normaliseXAxis(childConnectionDCA, childConnectionDCA_min, childConnectionDCA_max)
-    normaliseXAxis(childConnectionExtrapDistance, childConnectionExtrapDistance_min, childConnectionExtrapDistance_max)
-    normaliseXAxis(childConnectionLRatio, childConnectionLRatio_min, childConnectionLRatio_max)
-    normaliseXAxis(parentConnectionPointNUpstreamHits, parentConnectionPointNUpstreamHits_min, parentConnectionPointNUpstreamHits_max)
-    normaliseXAxis(parentConnectionPointNDownstreamHits, parentConnectionPointNDownstreamHits_min, parentConnectionPointNDownstreamHits_max)
-    normaliseXAxis(parentConnectionPointNHitRatio, parentConnectionPointNHitRatio_min, parentConnectionPointNHitRatio_max)
-    normaliseXAxis(parentConnectionPointEigenValueRatio, parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
-    normaliseXAxis(parentConnectionPointOpeningAngle, parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
-    normaliseXAxis(pidLinkType, pidLinkType_min, pidLinkType_max)
+    if (normalise) :
+        normaliseXAxis(parentTrackScore, parentTrackScore_min, parentTrackScore_max)
+        normaliseXAxis(childTrackScore, parentTrackScore_min, parentTrackScore_max)    
+        normaliseXAxis(parentNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max)   
+        normaliseXAxis(childNSpacepoints, parentNSpacepoints_min, parentNSpacepoints_max) 
+        normaliseXAxis(parentNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max) 
+        normaliseXAxis(childNuVertexSep, parentNuVertexSeparation_min, parentNuVertexSeparation_max) 
+        normaliseXAxis(separation3D, separation3D_min, separation3D_max)
+        normaliseXAxis(parentEndRegionNHits, parentEndRegionNHits_min, parentEndRegionNHits_max)
+        normaliseXAxis(parentEndRegionNParticles, parentEndRegionNParticles_min, parentEndRegionNParticles_max)
+        normaliseXAxis(parentEndRegionRToWall, parentEndRegionRToWall_min, parentEndRegionRToWall_max)
+        normaliseXAxis(vertexSeparation, vertexSeparation_min, vertexSeparation_max)
+        normaliseXAxis(doesChildConnect, doesChildConnect_min, doesChildConnect_max)
+        normaliseXAxis(overshootStartDCA, overshootDCA_min, overshootDCA_max)
+        normaliseXAxis(overshootStartL, overshootL_min, overshootL_max)
+        normaliseXAxis(overshootEndDCA, overshootDCA_min, overshootDCA_max)
+        normaliseXAxis(overshootEndL, overshootL_min, overshootL_max)
+        normaliseXAxis(childConnectionDCA, childConnectionDCA_min, childConnectionDCA_max)
+        normaliseXAxis(childConnectionExtrapDistance, childConnectionExtrapDistance_min, childConnectionExtrapDistance_max)
+        normaliseXAxis(childConnectionLRatio, childConnectionLRatio_min, childConnectionLRatio_max)
+        normaliseXAxis(parentConnectionPointNUpstreamHits, parentConnectionPointNUpstreamHits_min, parentConnectionPointNUpstreamHits_max)
+        normaliseXAxis(parentConnectionPointNDownstreamHits, parentConnectionPointNDownstreamHits_min, parentConnectionPointNDownstreamHits_max)
+        normaliseXAxis(parentConnectionPointNHitRatio, parentConnectionPointNHitRatio_min, parentConnectionPointNHitRatio_max)
+        normaliseXAxis(parentConnectionPointEigenValueRatio, parentConnectionPointEigenValueRatio_min, parentConnectionPointEigenValueRatio_max)
+        normaliseXAxis(parentConnectionPointOpeningAngle, parentConnectionPointOpeningAngle_min, parentConnectionPointOpeningAngle_max) 
 
     ###################################
     # Concatenate
@@ -949,10 +726,9 @@ def readTreeGroupLinks_shower(fileNames) :
                                 parentNSpacepoints.reshape(nLinks, 1), \
                                 childNSpacepoints.reshape(nLinks, 1), \
                                 separation3D.reshape(nLinks, 1), \
-                                pidLinkType.reshape(nLinks, 1), \
                                 coc0), axis=1)
     
-    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect, trueParentVisibleGeneration, trueChildVisibleGeneration, trainingCutSep, trainingCutDoesConnect, trainingCutL, trainingCutT
+    return nLinks, variables, y, trueParentChildLink, isLinkOrientationCorrect, trueChildVisibleGeneration, trainingCutSep, trainingCutDoesConnect, trainingCutL, trainingCutT
 
 ############################################################################################################################################
 ############################################################################################################################################    
