@@ -6,6 +6,150 @@ BOGUS_INT = -999
 ####################################################################################################################################### 
 #######################################################################################################################################
 
+def calculateMetrics_primaryLinkOrientation(nEntries, particle_mask_in, primary_link_mask_in, 
+                                            primaryPFPIndex_in, primaryIsPredOrientationCorrect_in, new_gen_in) :
+
+    n_assigned_track = 0
+    n_correct_track = 0
+
+    for iEvent in range(nEntries) : 
+
+        # Masks
+        particle_mask = np.array(particle_mask_in[iEvent])
+        primary_link_mask = np.array(primary_link_mask_in[iEvent])
+        # New
+        newGen_np = new_gen_in[iEvent]
+        pfpIndex_np = range(newGen_np.shape[0])
+        # Primary network
+        primaryPFPIndex_np = np.array(primaryPFPIndex_in[iEvent], dtype='int')[primary_link_mask]
+        primaryIsPredOrientationCorrect_np = np.array(primaryIsPredOrientationCorrect_in[iEvent], dtype='int')[primary_link_mask]
+    
+        for iParticle in pfpIndex_np:
+
+            if (newGen_np[iParticle] != 2) : 
+                continue
+
+            targetIndex = np.where(primaryPFPIndex_np == iParticle)[0]
+            if ((targetIndex.shape[0] != 0) and (primaryIsPredOrientationCorrect_np[targetIndex[0]] != -1)) :
+                n_assigned_track += 1
+                n_correct_track += (1 if primaryIsPredOrientationCorrect_np[targetIndex[0]] else 0)
+
+    print('n_assigned_track:', n_assigned_track)
+    print('n_correct_track:', n_correct_track)
+
+    print('correctness of TRUE links:', round((float(n_correct_track) / float(n_assigned_track)) * 100.0, 2))
+
+    
+####################################################################################################################################### 
+#######################################################################################################################################
+
+def calculateMetrics_LinkOrientationCorrectness(nEntries, particle_mask_in, trackShowerScore_in, 
+                                                particleTrueOrientation_in, trueVisibleGeneration_in, 
+                                                particlePredictedOrientation_in, newGen_in, childGen) :
+
+    n_assigned = 0
+    n_correct = 0
+
+    for iEvent in range(nEntries) : 
+
+        # Masks
+        particle_mask = np.array(particle_mask_in[iEvent])
+        # PFP info
+        trackShowerScore = np.array(trackShowerScore_in[iEvent])[particle_mask]
+        particlePredictedOrientation = np.array(particlePredictedOrientation_in[iEvent])
+        # True info 
+        particleTrueOrientation = np.array(particleTrueOrientation_in[iEvent])
+        trueVisibleGeneration = np.array(trueVisibleGeneration_in[iEvent])[particle_mask]
+        # New
+        newGen_np = newGen_in[iEvent]
+    
+        for iParticle in range(np.count_nonzero(particle_mask)) :
+
+            if (newGen_np[iParticle] != childGen) :
+                continue     
+
+            if (trueVisibleGeneration[iParticle] != childGen) :
+                continue
+
+            if (particleTrueOrientation[iParticle] == -999) :
+                continue
+
+            if not (trackShowerScore[iParticle] > 0.5) :
+                continue
+
+            n_assigned += 1
+            n_correct += 1 if (particlePredictedOrientation[iParticle] == 1) else 0
+                    
+    print('##########################') 
+    print('# Metrics for child gen:', childGen)                        
+    print('##########################')                
+    print('n_assigned:', n_assigned)
+    print('n_correct:', n_correct)
+    print('correctness of TRUE links:', round((float(n_correct) / float(n_assigned)) * 100.0, 2))
+
+####################################################################################################################################### 
+#######################################################################################################################################    
+    
+    
+
+####################################################################################################################################### 
+#######################################################################################################################################
+
+def calculateMetrics_higherLinkOrientation(nEntries, particle_mask_in, higher_link_mask_in, trackShowerScore_in,
+                                           parentPFPIndex_in, childPFPIndex_in, particlePredictedOrientation_in,
+                                           newGen_in, newParentPFPIndex_in, childGen) :
+
+    n_assigned_track = 0
+    n_correct_track = 0
+
+    n_assigned_shower = 0
+    n_correct_shower = 0
+
+    for iEvent in range(nEntries) : 
+
+        # Masks
+        particle_mask = np.array(particle_mask_in[iEvent])
+        higher_link_mask = np.array(higher_link_mask_in[iEvent])                
+        # PFP info
+        trackShowerScore = np.array(trackShowerScore_in[iEvent])[particle_mask]
+        # New
+        newGen_np = np.array(newGen_in[iEvent])
+        new_parentPFPIndex_np = np.array(newParentPFPIndex_in[iEvent])
+        # Higher tier network
+        higherTierParentIndex = np.array(parentPFPIndex_in[iEvent], dtype='int')[higher_link_mask]
+        higherTierChildIndex = np.array(childPFPIndex_in[iEvent], dtype='int')[higher_link_mask]
+        higherIsPredOrientationCorrect = np.array(higherIsPredOrientationCorrect_in[iEvent], dtype='int')[higher_link_mask]
+    
+        for iParticle in range(newGen_np.shape[0]) :
+
+            if (newGen_np[iParticle] != childGen) :
+                continue        
+
+            targetIndex = np.where(np.logical_and(higherTierChildIndex == iParticle, higherTierParentIndex == new_parentPFPIndex_np[iParticle]))[0]
+        
+            if ((targetIndex.shape[0] != 0) and (higherIsPredOrientationCorrect[targetIndex[0]] != -1)) :
+
+                if (trackShowerScore[iParticle] > 0.5) :            
+                    n_assigned_track += 1
+                    n_correct_track += (1 if higherIsPredOrientationCorrect[targetIndex[0]] else 0)
+                else :            
+                    n_assigned_shower += 1
+                    n_correct_shower += (1 if higherIsPredOrientationCorrect[targetIndex[0]] else 0)
+                    
+    print('##########################') 
+    print('# Metrics for child gen:', childGen)                        
+    print('##########################')                
+    print('n_assigned_track:', n_assigned_track)
+    print('n_correct_track:', n_correct_track)
+    print('correctness of TRUE links (tracks):', round((float(n_correct_track) / float(n_assigned_track)) * 100.0, 2))
+
+    print('n_assigned_shower:', n_assigned_shower)
+    print('n_correct_shower:', n_correct_shower)    
+    print('correctness of TRUE links (showers):', round((float(n_correct_shower) / float(n_assigned_shower)) * 100.0, 2))
+
+####################################################################################################################################### 
+#######################################################################################################################################
+
 def calculateMetrics_leading_lepton(nEntries, particleMask_in, nSpacepoints_in, pfpTruePDG_in, trueVisibleGeneration_in, isNC_in, nuPDG_in, new_gen) :
 
     n_two_d = 0
@@ -38,12 +182,12 @@ def calculateMetrics_leading_lepton(nEntries, particleMask_in, nSpacepoints_in, 
 
     for iEvent in range(nEntries) : 
 
-#         # if target event?
-#         if (isNC_in[iEvent] == 1) :
-#             continue            
+        # if target event?
+        if (isNC_in[iEvent] == 1) :
+            continue            
             
-#         if ((nuPDG_in[iEvent] != 12) and (nuPDG_in[iEvent] != 14)) :
-#             continue
+        if ((nuPDG_in[iEvent] != 12) and (nuPDG_in[iEvent] != 14)) :
+            continue
             
         # Particle mask
         particle_mask = np.array(particleMask_in[iEvent])
@@ -153,7 +297,7 @@ def calculateMetrics_leading_lepton(nEntries, particleMask_in, nSpacepoints_in, 
 ####################################################################################################################################### 
 #######################################################################################################################################
 
-def calculateMetrics_new(nEntries, particleMask_in, nSpacepoints_in, trackShowerScore_in, trueVisibleGeneration_in, trueVisibleParentPFPIndex_in, new_parentPFPIndex, new_gen) :
+def calculateMetrics_new(nEntries, particleMask_in, trackShowerScore_in, trueVisibleGeneration_in, trueVisibleParentID_in, new_parentID, new_gen) :
     for isTrack in [True, False] :
         n_two_d = 0
         n_true_primary = 0
@@ -193,31 +337,28 @@ def calculateMetrics_new(nEntries, particleMask_in, nSpacepoints_in, trackShower
             # Particle mask
             particle_mask = np.array(particleMask_in[iEvent])
             # PFP info
-            nSpacepoints_np = np.array(nSpacepoints_in[iEvent])[particle_mask]
             trackShowerScore_np = np.array(trackShowerScore_in[iEvent])[particle_mask]
             # Truth
             trueVisibleGeneration_np = np.array(trueVisibleGeneration_in[iEvent])[particle_mask]
-            trueVisibleParentPFPIndex_np = np.array(trueVisibleParentPFPIndex_in[iEvent])[particle_mask]
+            trueVisibleParentID_np = np.array(trueVisibleParentID_in[iEvent])[particle_mask]
             # New
-            newParentPFPIndex_np = np.array(new_parentPFPIndex[iEvent])[particle_mask]
+            newParentID_np = np.array(new_parentID[iEvent])[particle_mask]
             newGen_np = np.array(new_gen[iEvent])[particle_mask]
 
             #########################
             # Get tier masks
             #########################
-            ignore_mask = np.logical_or(nSpacepoints_np == 0, trueVisibleGeneration_np == -999)
             trackShower_mask = (trackShowerScore_np > 0.5) if isTrack else np.logical_not(trackShowerScore_np > 0.5)
-            true_primary_mask = np.logical_and(np.logical_and(np.logical_not(ignore_mask), trackShower_mask), trueVisibleGeneration_np == 2)
-            true_secondary_mask = np.logical_and(np.logical_and(np.logical_not(ignore_mask), trackShower_mask), trueVisibleGeneration_np == 3)
-            true_tertiary_mask = np.logical_and(np.logical_and(np.logical_not(ignore_mask), trackShower_mask), trueVisibleGeneration_np == 4)
-            true_higher_mask = np.logical_and(np.logical_and(np.logical_not(ignore_mask), trackShower_mask), 
-                                              np.logical_not(np.logical_or(true_primary_mask, np.logical_or(true_secondary_mask, true_tertiary_mask))))
+            true_primary_mask = np.logical_and(trackShower_mask, trueVisibleGeneration_np == 2)
+            true_secondary_mask = np.logical_and(trackShower_mask, trueVisibleGeneration_np == 3)
+            true_tertiary_mask = np.logical_and(trackShower_mask, trueVisibleGeneration_np == 4)
+            true_higher_mask = np.logical_and(trackShower_mask, np.logical_not(np.logical_or(true_primary_mask, np.logical_or(true_secondary_mask, true_tertiary_mask))))
 
             #############################################
             # Get metrics for this event - debugging
             #############################################
             # Totals
-            this_two_d = np.count_nonzero(np.logical_and(ignore_mask, trackShower_mask))
+            this_two_d = 0
             this_true_primary = np.count_nonzero(true_primary_mask)
             this_true_secondary = np.count_nonzero(true_secondary_mask)
             this_true_tertiary = np.count_nonzero(true_tertiary_mask)
@@ -229,35 +370,35 @@ def calculateMetrics_new(nEntries, particleMask_in, nSpacepoints_in, trackShower
             this_tagged_as_primary_primary = 0
             this_not_tagged_primary = np.count_nonzero(newGen_np[true_primary_mask] == BOGUS_INT)
             this_incorrect_parent_primary = np.count_nonzero(np.logical_and(newGen_np[true_primary_mask] != 2, \
-                                                                                newGen_np[true_primary_mask] != BOGUS_INT)) 
+                                                                            newGen_np[true_primary_mask] != BOGUS_INT)) 
             # Secondary
-            this_correct_parent_correct_tier_secondary = np.count_nonzero(np.logical_and(newParentPFPIndex_np[true_secondary_mask] == trueVisibleParentPFPIndex_np[true_secondary_mask], \
+            this_correct_parent_correct_tier_secondary = np.count_nonzero(np.logical_and(newParentID_np[true_secondary_mask] == trueVisibleParentID_np[true_secondary_mask], \
                                                                                          newGen_np[true_secondary_mask] == 3))
-            this_correct_parent_wrong_tier_secondary = np.count_nonzero(np.logical_and(newParentPFPIndex_np[true_secondary_mask] == trueVisibleParentPFPIndex_np[true_secondary_mask], \
+            this_correct_parent_wrong_tier_secondary = np.count_nonzero(np.logical_and(newParentID_np[true_secondary_mask] == trueVisibleParentID_np[true_secondary_mask], \
                                                                                        np.logical_and(newGen_np[true_secondary_mask] != 3, \
                                                                                                       newGen_np[true_secondary_mask] != BOGUS_INT)))
             this_tagged_as_primary_secondary = np.count_nonzero(newGen_np[true_secondary_mask] == 2)
             this_not_tagged_secondary = np.count_nonzero(newGen_np[true_secondary_mask] == BOGUS_INT)
-            this_incorrect_parent_secondary = np.count_nonzero(np.logical_not(np.logical_or(newParentPFPIndex_np[true_secondary_mask] == trueVisibleParentPFPIndex_np[true_secondary_mask], \
+            this_incorrect_parent_secondary = np.count_nonzero(np.logical_not(np.logical_or(newParentID_np[true_secondary_mask] == trueVisibleParentID_np[true_secondary_mask], \
                                                                                             np.logical_or(newGen_np[true_secondary_mask] == 2, \
                                                                                                           newGen_np[true_secondary_mask] == BOGUS_INT))))
             # Tertiary
-            this_correct_parent_correct_tier_tertiary = np.count_nonzero(np.logical_and(newParentPFPIndex_np[true_tertiary_mask] == trueVisibleParentPFPIndex_np[true_tertiary_mask], \
+            this_correct_parent_correct_tier_tertiary = np.count_nonzero(np.logical_and(newParentID_np[true_tertiary_mask] == trueVisibleParentID_np[true_tertiary_mask], \
                                                                                         newGen_np[true_tertiary_mask] == 4))
-            this_correct_parent_wrong_tier_tertiary = np.count_nonzero(np.logical_and(newParentPFPIndex_np[true_tertiary_mask] == trueVisibleParentPFPIndex_np[true_tertiary_mask], \
+            this_correct_parent_wrong_tier_tertiary = np.count_nonzero(np.logical_and(newParentID_np[true_tertiary_mask] == trueVisibleParentID_np[true_tertiary_mask], \
                                                                                       np.logical_and(newGen_np[true_tertiary_mask] != 4, \
                                                                                                      newGen_np[true_tertiary_mask] != BOGUS_INT)))
             this_tagged_as_primary_tertiary = np.count_nonzero(newGen_np[true_tertiary_mask] == 2)
             this_not_tagged_tertiary = np.count_nonzero(newGen_np[true_tertiary_mask] == BOGUS_INT)
-            this_incorrect_parent_tertiary = np.count_nonzero(np.logical_not(np.logical_or(newParentPFPIndex_np[true_tertiary_mask] == trueVisibleParentPFPIndex_np[true_tertiary_mask], \
+            this_incorrect_parent_tertiary = np.count_nonzero(np.logical_not(np.logical_or(newParentID_np[true_tertiary_mask] == trueVisibleParentID_np[true_tertiary_mask], \
                                                                                            np.logical_or(newGen_np[true_tertiary_mask] == 2, \
                                                                                                          newGen_np[true_tertiary_mask] == BOGUS_INT))))
             # Higher
             this_correct_parent_correct_tier_higher = 0
-            this_correct_parent_wrong_tier_higher = np.count_nonzero(newParentPFPIndex_np[true_higher_mask] == trueVisibleParentPFPIndex_np[true_higher_mask])
+            this_correct_parent_wrong_tier_higher = np.count_nonzero(newParentID_np[true_higher_mask] == trueVisibleParentID_np[true_higher_mask])
             this_tagged_as_primary_higher = np.count_nonzero(newGen_np[true_higher_mask] == 2)
             this_not_tagged_higher = np.count_nonzero(newGen_np[true_higher_mask] == BOGUS_INT)
-            this_incorrect_parent_higher = np.count_nonzero(np.logical_not(np.logical_or(newParentPFPIndex_np[true_higher_mask] == trueVisibleParentPFPIndex_np[true_higher_mask], \
+            this_incorrect_parent_higher = np.count_nonzero(np.logical_not(np.logical_or(newParentID_np[true_higher_mask] == trueVisibleParentID_np[true_higher_mask], \
                                                                                          np.logical_or(newGen_np[true_higher_mask] == 2, \
                                                                                                        newGen_np[true_higher_mask] == BOGUS_INT))))
 
